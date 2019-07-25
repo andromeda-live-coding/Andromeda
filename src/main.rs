@@ -1,5 +1,6 @@
 use nannou::prelude::*;
 use nannou::ui::prelude::*;
+use std::fs;
 fn main() {
     nannou::app(model)
         .update(update)
@@ -14,6 +15,7 @@ struct Model {
     rotation: f32,
     color: Rgb,
     position: Point2,
+    code: String,
 }
 
 struct Ids {
@@ -44,8 +46,10 @@ fn model(app: &App) -> Model {
     let scale = 200.0;
     let rotation = 0.0;
     let position = pt2(0.0, 0.0);
-    let color = rgb(0.5, 0.4, 0.3);
-    
+    let color = rgb(0.9, 0.4, 0.3);
+    let code = fs::read_to_string("foo.txt")
+        .expect("Something went wrong reading the file");
+
     Model {
         ui,
         ids,
@@ -54,6 +58,7 @@ fn model(app: &App) -> Model {
         rotation,
         position,
         color,
+        code,
     }
 }
 
@@ -64,7 +69,7 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
         widget::Slider::new(val, min, max)
             .w_h(200.0, 30.0)
             .label_font_size(15)
-            .rgb(0.3, 0.3, 0.3)
+            .rgb(0.3, 0.3, 0.8)
             .label_rgb(1.0, 1.0, 1.0)
             .border(0.0)
     }
@@ -126,13 +131,17 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
     {
         model.position = Point2::new(x, y);
     }
+
+
+   
 }
 
 fn view(app: &App, model: &Model, frame: &Frame) {
+    
     let draw = app.draw();
     let t = app.time;
     let s = app.window_rect();
-    draw.background().rgb(0.89, 0.89, 0.67);
+    draw.background().rgb(0.89, 0.89, 0.61);
 
     draw.ellipse()
         .xy(model.position)
@@ -140,18 +149,31 @@ fn view(app: &App, model: &Model, frame: &Frame) {
         .resolution(model.resolution)
         .rotate(model.rotation)
         .color(model.color);
-    draw.line()
-        .start(s.top_left() * t.sin())
-        .end(s.bottom_right() * t.cos())
-        .thickness(s.h() *0.1)
-        .caps_round()
-        .color(RED);
+    // draw.line()
+    //     .start(s.top_left() * t.sin())
+    //     .end(s.bottom_right() * t.cos())
+    //     .thickness(s.h() *0.1)
+    //     .caps_round()
+    //     .color(RED);
 
-    // Draw a quad that follows the inverse of the ellipse.
-    draw.quad()
-        .x_y(-app.mouse.x, app.mouse.y)
-        .color(GREEN)
-        .rotate(t);
+    // // Draw a quad that follows the inverse of the ellipse.
+    // draw.quad()
+    //     .x_y(-app.mouse.x, app.mouse.y)
+    //     .color(GREEN)
+    //     .rotate(t);
+
+
+    
+    for x in model.code.lines(){
+        println!("{}", x);
+    }
+
+
+
+
+
+
+
     // Write the result of our drawing to the window's frame.
     draw.to_frame(app, &frame).unwrap();
 
