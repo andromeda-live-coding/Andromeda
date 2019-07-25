@@ -130,9 +130,9 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 
 fn view(app: &App, model: &Model, frame: &Frame) {
     let draw = app.draw();
-    let c = app.time;
-    println!("{}", c);
-    draw.background().rgb(0.02, 0.02, 0.02);
+    let t = app.time;
+    let s = app.window_rect();
+    draw.background().rgb(0.89, 0.89, 0.67);
 
     draw.ellipse()
         .xy(model.position)
@@ -140,10 +140,22 @@ fn view(app: &App, model: &Model, frame: &Frame) {
         .resolution(model.resolution)
         .rotate(model.rotation)
         .color(model.color);
+    draw.line()
+        .start(s.top_left() * t.sin())
+        .end(s.bottom_right() * t.cos())
+        .thickness(s.h() *0.1)
+        .caps_round()
+        .color(RED);
 
+    // Draw a quad that follows the inverse of the ellipse.
+    draw.quad()
+        .x_y(-app.mouse.x, app.mouse.y)
+        .color(GREEN)
+        .rotate(t);
     // Write the result of our drawing to the window's frame.
     draw.to_frame(app, &frame).unwrap();
 
     // Draw the state of the `Ui` to the frame.
     model.ui.draw_to_frame(app, &frame).unwrap();
+    
 }
