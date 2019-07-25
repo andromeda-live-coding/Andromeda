@@ -12,7 +12,7 @@ struct Model {
     resolution: usize,
     scale: f32,
     rotation: f32,
-    color: i32, // Rgb
+    color: Rgb,
     position: Point2,
 }
 
@@ -44,12 +44,8 @@ fn model(app: &App) -> Model {
     let scale = 200.0;
     let rotation = 0.0;
     let position = pt2(0.0, 0.0);
-    let color = 22; // rgb(0.5, 0.4, 0.3)
-    let a = Rgb{
-        red: 1.0,
-        green: 0.3,
-        blue: 0.7,
-    };
+    let color = rgb(0.5, 0.4, 0.3);
+    
     Model {
         ui,
         ids,
@@ -108,7 +104,7 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
         .border(0.0)
         .set(model.ids.random_color, ui)
     {
-        model.color = 22; // rgb(random(), random(), random())
+        model.color = rgb(random(), random(), random())
     }
 
     for (x, y) in widget::XYPad::new(
@@ -132,9 +128,10 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
     }
 }
 
-fn view(app: &App, model: &Model, frame: Frame) -> Frame {
+fn view(app: &App, model: &Model, frame: &Frame) {
     let draw = app.draw();
-
+    let c = app.time;
+    println!("{}", c);
     draw.background().rgb(0.02, 0.02, 0.02);
 
     draw.ellipse()
@@ -142,12 +139,11 @@ fn view(app: &App, model: &Model, frame: Frame) -> Frame {
         .radius(model.scale)
         .resolution(model.resolution)
         .rotate(model.rotation)
-        .color(RED); // model.color
+        .color(model.color);
 
     // Write the result of our drawing to the window's frame.
     draw.to_frame(app, &frame).unwrap();
 
     // Draw the state of the `Ui` to the frame.
     model.ui.draw_to_frame(app, &frame).unwrap();
-    frame
 }
