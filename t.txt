@@ -1,0 +1,1 @@
+ui.fonts_mut().insert_from_file("timesnewarial.ttf").unwrap();

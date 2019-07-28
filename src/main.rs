@@ -2,10 +2,7 @@ use nannou::prelude::*;
 use nannou::ui::prelude::*;
 use std::fs;
 fn main() {
-    nannou::app(model)
-        .update(update)
-        .simple_window(view)
-        .run();
+    nannou::app(model).update(update).simple_window(view).run();
 }
 struct Model {
     ui: Ui,
@@ -15,7 +12,7 @@ struct Model {
     rotation: f32,
     color: Rgb,
     position: Point2,
-    code: String,
+    text_edit: String,
 }
 
 struct Ids {
@@ -24,14 +21,16 @@ struct Ids {
     rotation: widget::Id,
     random_color: widget::Id,
     position: widget::Id,
+    text_edit: widget::Id,
 }
 
 fn model(app: &App) -> Model {
     app.set_loop_mode(LoopMode::wait(3));
-
     // Create the UI.
     let mut ui = app.new_ui().build().unwrap();
-    ui.fonts_mut().insert_from_file("timesnewarial.ttf").unwrap();
+    ui.fonts_mut()
+        .insert_from_file("timesnewarial.ttf")
+        .unwrap();
     // Generate some ids for our widgets.
     let ids = Ids {
         resolution: ui.generate_widget_id(),
@@ -39,6 +38,7 @@ fn model(app: &App) -> Model {
         rotation: ui.generate_widget_id(),
         random_color: ui.generate_widget_id(),
         position: ui.generate_widget_id(),
+        text_edit: ui.generate_widget_id(),
     };
 
     // Init our variables
@@ -47,9 +47,7 @@ fn model(app: &App) -> Model {
     let rotation = 0.0;
     let position = pt2(0.0, 0.0);
     let color = rgb(0.9, 0.4, 0.3);
-    let code = fs::read_to_string("foo.txt")
-        .expect("Something went wrong reading the file");
-
+    let text_edit = "bufu".to_owned();
     Model {
         ui,
         ids,
@@ -58,7 +56,7 @@ fn model(app: &App) -> Model {
         rotation,
         position,
         color,
-        code,
+        text_edit,
     }
 }
 
@@ -100,7 +98,7 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 
     for _click in widget::Button::new()
         .top_left_with_margin(20.0)
-        .down(100.0)
+        .down(10.0)
         .w_h(200.0, 60.0)
         .label("Random Color")
         .label_font_size(15)
@@ -131,17 +129,22 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
     {
         model.position = Point2::new(x, y);
     }
-
-
-   
+    for edit in widget::TextEdit::new(&model.text_edit)
+        .color(color::RED)
+        .down(10.0)
+        .line_spacing(2.5)
+        //.restrict_to_height(false) // Let the height grow infinitely and scroll.
+        .set(model.ids.text_edit, ui)
+    {
+        model.text_edit = edit;
+    }
 }
 
 fn view(app: &App, model: &Model, frame: &Frame) {
-    
     let draw = app.draw();
     let t = app.time;
     let s = app.window_rect();
-    draw.background().rgb(0.89, 0.89, 0.61);
+    draw.background().rgb(0.22, 0.22, 0.22);
 
     draw.ellipse()
         .xy(model.position)
@@ -162,22 +165,9 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     //     .color(GREEN)
     //     .rotate(t);
 
-
-    
-    for x in model.code.lines(){
-        println!("{}", x);
-    }
-
-
-
-
-
-
-
     // Write the result of our drawing to the window's frame.
     draw.to_frame(app, &frame).unwrap();
 
     // Draw the state of the `Ui` to the frame.
     model.ui.draw_to_frame(app, &frame).unwrap();
-    
 }
