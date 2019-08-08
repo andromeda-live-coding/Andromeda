@@ -356,3 +356,38 @@ pub enum Atom {
     Bool(bool),
     Vval((String, f32)),
 }
+
+fn check_syntax(content: &str) -> bool {
+    match parser(content) {
+        Ok(not_parsed) => {
+            if not_parsed.0 == "" {
+                true
+            } else {
+                false
+            }
+        }
+        Err(err) => (false),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_valid() {
+        let content = "x: 12.3\nbox x";
+        assert_eq!(check_syntax(content), true);
+    }
+
+    #[test]
+    fn test_invalid_1() {
+        let content = "asldkjasldkjal";
+        assert_eq!(check_syntax(content), false);
+    }
+
+    #[test]
+    fn test_invalid_2() {
+        let content = "x: 123.4\nbox x\n uncorrect syntax";
+        assert_eq!(check_syntax(content), false);
+    }
+}
