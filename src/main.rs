@@ -1,9 +1,48 @@
+// nom
+use nom::branch::alt;
+use nom::bytes::complete::tag;
+use nom::character::complete::{alpha1, multispace0, one_of, space0};
+use nom::combinator::map;
+use nom::error::VerboseError;
+use nom::multi::many0;
+use nom::number::complete::float;
+use nom::sequence::{preceded, tuple};
+use nom::IResult;
+// nannou
 use nannou::prelude::*;
 use nannou::ui::prelude::*;
-use std::fs;
+// bufu
+use std::collections::HashMap;
+
 fn main() {
-    nannou::app(model).update(update).simple_window(view).run();
+    let x = parser(
+        "x: 10
+                y: 6
+                                
+                                    
+                                    
+                                        
+                                        box x
+                                        
+                                        
+                                        bufu",
+    );
+    match x {
+        Ok(ast) => {
+            for element in ast.1 {
+                println!("{:?}", element);
+            }
+        }
+        Err(_) => (),
+    }
+
+    // nannou::app(model)
+    //     .event(event)
+    //     .update(update)
+    //     .view(view)
+    //     .run();
 }
+
 struct Model {
     ui: Ui,
     ids: Ids,
@@ -13,6 +52,7 @@ struct Model {
     color: Rgb,
     position: Point2,
     text_edit: String,
+    text: String,
 }
 
 struct Ids {
@@ -22,10 +62,30 @@ struct Ids {
     random_color: widget::Id,
     position: widget::Id,
     text_edit: widget::Id,
+    text: widget::Id,
 }
 
 fn model(app: &App) -> Model {
     app.set_loop_mode(LoopMode::wait(3));
+    app.new_window()
+        .with_dimensions(720, 720)
+        .event(window_event)
+        .raw_event(raw_window_event)
+        .key_pressed(key_pressed)
+        .key_released(key_released)
+        .mouse_moved(mouse_moved)
+        .mouse_pressed(mouse_pressed)
+        .mouse_released(mouse_released)
+        .mouse_wheel(mouse_wheel)
+        .mouse_entered(mouse_entered)
+        .mouse_exited(mouse_exited)
+        .moved(window_moved)
+        .resized(window_resized)
+        .focused(window_focused)
+        .unfocused(window_unfocused)
+        .closed(window_closed)
+        .build()
+        .unwrap();
     // Create the UI.
     let mut ui = app.new_ui().build().unwrap();
     ui.fonts_mut()
@@ -39,6 +99,7 @@ fn model(app: &App) -> Model {
         random_color: ui.generate_widget_id(),
         position: ui.generate_widget_id(),
         text_edit: ui.generate_widget_id(),
+        text: ui.generate_widget_id(),
     };
 
     // Init our variables
@@ -48,6 +109,7 @@ fn model(app: &App) -> Model {
     let position = pt2(0.0, 0.0);
     let color = rgb(0.9, 0.4, 0.3);
     let text_edit = "bufu".to_owned();
+    let text = "bufu".to_owned();
     Model {
         ui,
         ids,
@@ -57,6 +119,7 @@ fn model(app: &App) -> Model {
         position,
         color,
         text_edit,
+        text,
     }
 }
 
@@ -129,22 +192,28 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
     {
         model.position = Point2::new(x, y);
     }
+
     for edit in widget::TextEdit::new(&model.text_edit)
         .color(color::RED)
         .down(10.0)
         .line_spacing(2.5)
-        //.restrict_to_height(false) // Let the height grow infinitely and scroll.
+        .restrict_to_height(false) // Let the height grow infinitely and scroll.
         .set(model.ids.text_edit, ui)
     {
         model.text_edit = edit;
     }
+
+    // widget::Text::new("Hallo")
+    //     .middle_of(ui.window)
+    //     .color(color::GREEN)
+    //     .font_size(102)
+    //     .set(model.ids.text, ui);
 }
 
 fn view(app: &App, model: &Model, frame: &Frame) {
     let draw = app.draw();
     let t = app.time;
-    let s = app.window_rect();
-    draw.background().rgb(0.22, 0.22, 0.22);
+    draw.background().rgb(0.09, 0.09, 0.09);
 
     draw.ellipse()
         .xy(model.position)
@@ -152,22 +221,134 @@ fn view(app: &App, model: &Model, frame: &Frame) {
         .resolution(model.resolution)
         .rotate(model.rotation)
         .color(model.color);
-    // draw.line()
-    //     .start(s.top_left() * t.sin())
-    //     .end(s.bottom_right() * t.cos())
-    //     .thickness(s.h() *0.1)
-    //     .caps_round()
-    //     .color(RED);
 
-    // // Draw a quad that follows the inverse of the ellipse.
-    // draw.quad()
-    //     .x_y(-app.mouse.x, app.mouse.y)
-    //     .color(GREEN)
-    //     .rotate(t);
+    for line in model.text_edit.lines() {
+        match line {
+            "quad" => {
+                draw.quad().color(BLUE).rotate(t);
+            }
+            "ellipse" => {
+                draw.ellipse()
+                    .xy(model.position)
+                    .radius(model.scale)
+                    .color(rgb(t.sin(), t.cos(), 0.8));
+            }
+            "tri" => {
+                draw.tri()
+                    .xy(Point2 { x: 30.0, y: 200.0 })
+                    .color(rgb(0.9, 0.9, t.sin()));
+            }
+            _ => {}
+        }
+    }
 
     // Write the result of our drawing to the window's frame.
     draw.to_frame(app, &frame).unwrap();
 
     // Draw the state of the `Ui` to the frame.
     model.ui.draw_to_frame(app, &frame).unwrap();
+}
+
+fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
+    match event {
+        KeyPressed(_key) => {}
+        KeyReleased(_key) => {}
+        MouseMoved(_pos) => {}
+        MousePressed(_button) => {}
+        MouseReleased(_button) => {}
+        MouseEntered => {}
+        MouseExited => {}
+        MouseWheel(_amount, _phase) => {}
+        Moved(_pos) => {}
+        Resized(_size) => {}
+        Touch(_touch) => {}
+        TouchPressure(_pressure) => {}
+        HoveredFile(_path) => {}
+        DroppedFile(_path) => {}
+        HoveredFileCancelled => {}
+        Focused => {}
+        Unfocused => {}
+        Closed => {}
+    }
+}
+
+fn event(_app: &App, _model: &mut Model, event: Event) {
+    match event {
+        Event::WindowEvent {
+            id: _,
+            raw: _,
+            simple: _,
+        } => {}
+        Event::DeviceEvent(_device_id, _event) => {}
+        Event::Update(_dt) => {}
+        Event::Awakened => {}
+        Event::Suspended(_b) => {}
+    }
+}
+
+// all the events must be implemented!
+
+fn raw_window_event(_app: &App, _model: &mut Model, _event: nannou::winit::WindowEvent) {}
+
+fn key_pressed(_app: &App, _model: &mut Model, _key: Key) {}
+
+fn key_released(_app: &App, _model: &mut Model, _key: Key) {}
+
+fn mouse_moved(_app: &App, _model: &mut Model, _pos: Point2) {}
+
+fn mouse_pressed(_app: &App, _model: &mut Model, _button: MouseButton) {}
+
+fn mouse_released(_app: &App, _model: &mut Model, _button: MouseButton) {}
+
+fn mouse_wheel(_app: &App, _model: &mut Model, _dt: MouseScrollDelta, _phase: TouchPhase) {}
+
+fn mouse_entered(_app: &App, _model: &mut Model) {}
+
+fn mouse_exited(_app: &App, _model: &mut Model) {}
+
+fn window_moved(_app: &App, _model: &mut Model, _pos: Point2) {}
+
+fn window_resized(_app: &App, _model: &mut Model, _dim: Vector2) {}
+
+fn window_focused(_app: &App, _model: &mut Model) {
+    println!("focused!");
+}
+
+fn window_unfocused(_app: &App, _model: &mut Model) {
+    println!("unfocused!");
+}
+
+fn window_closed(_app: &App, _model: &mut Model) {}
+
+fn variable_parser(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
+    map(alpha1, |x: &str| x)(input)
+}
+
+fn declare_variable(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
+    map(
+        tuple((variable_parser, one_of(":="), space0, float)),
+        |(name, _, _, value)| Atom::Vval((name.to_string(), value)),
+    )(input)
+}
+
+// it recognizes pattern box alpha
+fn declare_box_with_variable(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
+    map(preceded(tag("box "), variable_parser), |x: &str| {
+        Atom::Keyword(x.to_string())
+    })(input)
+}
+
+fn parser(input: &str) -> IResult<&str, Vec<Atom>, VerboseError<&str>> {
+    many0(alt((
+        preceded(multispace0, declare_variable),
+        preceded(multispace0, declare_box_with_variable),
+    )))(input)
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Atom {
+    Num(f32),
+    Keyword(String),
+    Bool(bool),
+    Vval((String, f32)),
 }
