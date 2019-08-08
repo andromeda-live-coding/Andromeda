@@ -236,7 +236,21 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                     // it should also cover other patterns
                     Atom::Keyword((x, y)) => {
                         if let Some(val) = variables.get(&y) {
-                            draw.quad().x_y(position.0, position.1).w_h(*val, *val);
+                            match x.as_ref() {
+                                "box" => {
+                                    draw.quad()
+                                        .x_y(position.0, position.1)
+                                        .w_h(*val, *val)
+                                        .color(model.color);
+                                }
+                                "circle" => {
+                                    draw.ellipse()
+                                        .x_y(position.0, position.1)
+                                        .w_h(*val, *val)
+                                        .color(model.color);
+                                }
+                                _ => (),
+                            }
                         }
                     }
                     Atom::Move((x, y)) => {
@@ -330,6 +344,7 @@ fn window_unfocused(_app: &App, _model: &mut Model) {
 
 fn window_closed(_app: &App, _model: &mut Model) {}
 
+// it recognizes a variable name like "x", "y", "xy", "myVariablE"
 fn variable_parser(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
     map(alpha1, |x: &str| x)(input)
 }
@@ -345,11 +360,12 @@ fn declare_variable_parser(input: &str) -> IResult<&str, Atom, VerboseError<&str
 // it recognizes pattern **box alpha** (where alpha is a variable)
 fn declare_box_with_variable_parser(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
     map(
-        tuple((tag("box"), space0, variable_parser)),
-        |(_, _, value)| Atom::Keyword(("box".to_string(), value.to_string())),
+        tuple((alt((tag("box"), tag("circle"))), space0, variable_parser)),
+        |(x, _, value)| Atom::Keyword((x.to_string(), value.to_string())),
     )(input)
 }
 
+// it recognizes pattern **move float float**
 fn move_parser(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
     map(
         tuple((tag("move"), space0, float, space0, float)),
@@ -357,6 +373,10 @@ fn move_parser(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
     )(input)
 }
 
+// it recognizes pattern **for digit1 times { expr }**
+fn for_parser() {}
+
+// connecting all simple parsers
 fn parser(input: &str) -> IResult<&str, Vec<Atom>, VerboseError<&str>> {
     many0(alt((
         preceded(multispace0, declare_variable_parser),
