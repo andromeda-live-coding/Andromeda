@@ -36,11 +36,11 @@ fn main() {
         Err(_) => (),
     }
 
-    // nannou::app(model)
-    //     .event(event)
-    //     .update(update)
-    //     .view(view)
-    //     .run();
+    nannou::app(model)
+        .event(event)
+        .update(update)
+        .view(view)
+        .run();
 }
 
 struct Model {
@@ -194,25 +194,21 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
     }
 
     for edit in widget::TextEdit::new(&model.text_edit)
-        .color(color::RED)
+        .color(color::WHITE)
         .down(10.0)
         .line_spacing(2.5)
-        .restrict_to_height(false) // Let the height grow infinitely and scroll.
+        .restrict_to_height(false)
         .set(model.ids.text_edit, ui)
     {
         model.text_edit = edit;
     }
-
-    // widget::Text::new("Hallo")
-    //     .middle_of(ui.window)
-    //     .color(color::GREEN)
-    //     .font_size(102)
-    //     .set(model.ids.text, ui);
 }
 
 fn view(app: &App, model: &Model, frame: &Frame) {
+    // how to declare an HashMap
+    let mut variables: HashMap<String, f32> = HashMap::new();
     let draw = app.draw();
-    let t = app.time;
+    //let t = app.time;
     draw.background().rgb(0.09, 0.09, 0.09);
 
     draw.ellipse()
@@ -222,24 +218,26 @@ fn view(app: &App, model: &Model, frame: &Frame) {
         .rotate(model.rotation)
         .color(model.color);
 
-    for line in model.text_edit.lines() {
-        match line {
-            "quad" => {
-                draw.quad().color(BLUE).rotate(t);
+    let text_to_parse = parser(&model.text_edit);
+    match text_to_parse {
+        Ok(ast) => {
+            for x in ast.1 {
+                match x {
+                    Atom::Vval((key, value)) => {
+                        //draw.quad().w_h(value, value);
+                        variables.insert(key, value);
+                    }
+                    Atom::Bool(val_bool) => (),
+                    Atom::Num(val_f32) => (),
+                    Atom::Keyword((x, y)) => {
+                        if let Some(val) = variables.get(&y) {
+                            draw.quad().w_h(*val, *val);
+                        }
+                    }
+                }
             }
-            "ellipse" => {
-                draw.ellipse()
-                    .xy(model.position)
-                    .radius(model.scale)
-                    .color(rgb(t.sin(), t.cos(), 0.8));
-            }
-            "tri" => {
-                draw.tri()
-                    .xy(Point2 { x: 30.0, y: 200.0 })
-                    .color(rgb(0.9, 0.9, t.sin()));
-            }
-            _ => {}
         }
+        Err(err) => (),
     }
 
     // Write the result of our drawing to the window's frame.
@@ -251,7 +249,11 @@ fn view(app: &App, model: &Model, frame: &Frame) {
 
 fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
     match event {
-        KeyPressed(_key) => {}
+        KeyPressed(key) => {
+            if key == nannou::prelude::Key::R {
+                println!("R");
+            }
+        }
         KeyReleased(_key) => {}
         MouseMoved(_pos) => {}
         MousePressed(_button) => {}
@@ -324,6 +326,7 @@ fn variable_parser(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
     map(alpha1, |x: &str| x)(input)
 }
 
+// it recognizes pattern **x: f32**
 fn declare_variable(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
     map(
         tuple((variable_parser, one_of(":="), space0, float)),
@@ -331,11 +334,12 @@ fn declare_variable(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
     )(input)
 }
 
-// it recognizes pattern box alpha
+// it recognizes pattern **box alpha** (where alpha is a variable)
 fn declare_box_with_variable(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
-    map(preceded(tag("box "), variable_parser), |x: &str| {
-        Atom::Keyword(x.to_string())
-    })(input)
+    map(
+        tuple((tag("box"), space0, variable_parser)),
+        |(_, _, value)| Atom::Keyword(("box".to_string(), value.to_string())),
+    )(input)
 }
 
 fn parser(input: &str) -> IResult<&str, Vec<Atom>, VerboseError<&str>> {
@@ -348,7 +352,7 @@ fn parser(input: &str) -> IResult<&str, Vec<Atom>, VerboseError<&str>> {
 #[derive(Debug, PartialEq, Clone)]
 pub enum Atom {
     Num(f32),
-    Keyword(String),
+    Keyword((String, String)),
     Bool(bool),
     Vval((String, f32)),
 }
