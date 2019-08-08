@@ -327,7 +327,7 @@ fn variable_parser(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
 }
 
 // it recognizes pattern **x: f32**
-fn declare_variable(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
+fn declare_variable_parser(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
     map(
         tuple((variable_parser, one_of(":="), space0, float)),
         |(name, _, _, value)| Atom::Vval((name.to_string(), value)),
@@ -335,17 +335,24 @@ fn declare_variable(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
 }
 
 // it recognizes pattern **box alpha** (where alpha is a variable)
-fn declare_box_with_variable(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
+fn declare_box_with_variable_parser(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
     map(
         tuple((tag("box"), space0, variable_parser)),
         |(_, _, value)| Atom::Keyword(("box".to_string(), value.to_string())),
     )(input)
 }
 
+fn move_parser(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
+    map(
+        tuple((tag("move"), space0, float, space0, float)),
+        |(_, _, val1, _, val2)| Atom::Keyword((val1.to_string(), val2.to_string())),
+    )(input)
+}
+
 fn parser(input: &str) -> IResult<&str, Vec<Atom>, VerboseError<&str>> {
     many0(alt((
-        preceded(multispace0, declare_variable),
-        preceded(multispace0, declare_box_with_variable),
+        preceded(multispace0, declare_variable_parser),
+        preceded(multispace0, declare_box_with_variable_parser),
     )))(input)
 }
 
