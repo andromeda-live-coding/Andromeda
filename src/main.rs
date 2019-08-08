@@ -208,6 +208,8 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     // how to declare an HashMap
     let mut variables: HashMap<String, f32> = HashMap::new();
     let draw = app.draw();
+    let mut position: (f32, f32) = (0.0, 0.0);
+
     //let t = app.time;
     draw.background().rgb(0.09, 0.09, 0.09);
 
@@ -218,6 +220,8 @@ fn view(app: &App, model: &Model, frame: &Frame) {
         .rotate(model.rotation)
         .color(model.color);
 
+    //////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////
     let text_to_parse = parser(&model.text_edit);
     match text_to_parse {
         Ok(ast) => {
@@ -227,12 +231,16 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                         //draw.quad().w_h(value, value);
                         variables.insert(key, value);
                     }
-                    Atom::Bool(val_bool) => (),
                     Atom::Num(val_f32) => (),
+                    // actually implementing box space0 alpha1 pattern (to recognize "box x", or "box y")
+                    // it should also cover other patterns
                     Atom::Keyword((x, y)) => {
                         if let Some(val) = variables.get(&y) {
-                            draw.quad().w_h(*val, *val);
+                            draw.quad().x_y(position.0, position.1).w_h(*val, *val);
                         }
+                    }
+                    Atom::Move((x, y)) => {
+                        position = (x, y);
                     }
                 }
             }
@@ -345,7 +353,7 @@ fn declare_box_with_variable_parser(input: &str) -> IResult<&str, Atom, VerboseE
 fn move_parser(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
     map(
         tuple((tag("move"), space0, float, space0, float)),
-        |(_, _, val1, _, val2)| Atom::Keyword((val1.to_string(), val2.to_string())),
+        |(_, _, val1, _, val2)| Atom::Move((val1, val2)),
     )(input)
 }
 
@@ -353,6 +361,7 @@ fn parser(input: &str) -> IResult<&str, Vec<Atom>, VerboseError<&str>> {
     many0(alt((
         preceded(multispace0, declare_variable_parser),
         preceded(multispace0, declare_box_with_variable_parser),
+        preceded(multispace0, move_parser),
     )))(input)
 }
 
@@ -360,8 +369,8 @@ fn parser(input: &str) -> IResult<&str, Vec<Atom>, VerboseError<&str>> {
 pub enum Atom {
     Num(f32),
     Keyword((String, String)),
-    Bool(bool),
     Vval((String, f32)),
+    Move((f32, f32)),
 }
 
 fn check_syntax(content: &str) -> bool {
