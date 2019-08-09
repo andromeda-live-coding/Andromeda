@@ -5,7 +5,7 @@ use nannou::ui::prelude::*;
 // std
 use std::collections::HashMap;
 // Atom
-use parser::Atom;
+use parser::Command;
 
 fn main() {
     nannou::app(model)
@@ -22,7 +22,7 @@ struct Model {
     position: Point2,
     text_edit: String,
     variables: HashMap<String, f32>,
-    instructions: Vec<Atom>,
+    instructions: Vec<Command>,
 }
 
 struct Ids {
@@ -65,7 +65,7 @@ fn model(app: &App) -> Model {
     let color = rgb(0.9, 0.4, 0.3);
     let text_edit = "bufu".to_owned();
     let variables = HashMap::new();
-    let instructions: Vec<Atom> = Vec::new();
+    let instructions: Vec<Command> = Vec::new();
 
     Model {
         ui,
@@ -98,10 +98,10 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     draw.background().rgb(0.39, 0.39, 0.39);
     for x in &model.instructions {
         match x {
-            Atom::Vval((_, _)) => {}
+            Command::DeclareVariable((_, _)) => {}
             // actually implementing box space0 alpha1 pattern (to recognize "box x", or "box y")
             // it should also cover other patterns
-            Atom::Keyword((x, y)) => {
+            Command::DrawShape((x, y)) => {
                 if let Some(val) = model.variables.get(y) {
                     match x.as_ref() {
                         "box" => {
@@ -124,7 +124,22 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             // Here we assing to position the value of instruction move so we can
             // draw all our object in the right position
             //
-            Atom::Move(bufu) => (position = *bufu),
+            Command::Move(bufu) => (position = *bufu),
+            Command::DrawShapeWf32((shape, f32value)) => match shape.as_ref() {
+                "box" => {
+                    draw.quad()
+                        .x_y(position.0, position.1)
+                        .w_h(*f32value, *f32value)
+                        .color(model.color);
+                }
+                "circle" => {
+                    draw.ellipse()
+                        .x_y(position.0, position.1)
+                        .w_h(*f32value, *f32value)
+                        .color(model.color);
+                }
+                _ => (),
+            },
         }
     }
     //
@@ -146,12 +161,13 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                         model.instructions = ast;
                         for x in model.instructions.to_owned() {
                             match x {
-                                Atom::Vval((key, value)) => {
+                                Command::DeclareVariable((key, value)) => {
                                     model.variables.insert(key, value);
                                 }
-                                Atom::Keyword((_, _)) => {}
+                                Command::DrawShape((_, _)) => {}
 
-                                Atom::Move((x, y)) => (model.position = pt2(x, y)),
+                                Command::Move((x, y)) => (model.position = pt2(x, y)),
+                                Command::DrawShapeWf32((_, _)) => (),
                             }
                         }
                     }

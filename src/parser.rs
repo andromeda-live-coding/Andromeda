@@ -1,3 +1,5 @@
+// IT'S LIKE IT VISIT ast 2 TIMES ???????????????????????????????????????????????
+
 // nom
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -15,43 +17,55 @@ fn variable_parser(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
 }
 
 // it recognizes pattern **x: f32**
-fn declare_variable_parser(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
+fn declare_variable_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     map(
         tuple((variable_parser, one_of(":="), space0, float)),
-        |(name, _, _, value)| Atom::Vval((name.to_string(), value)),
+        |(name, _, _, value)| Command::DeclareVariable((name.to_string(), value)),
     )(input)
 }
 
 // it recognizes pattern **box alpha** (where alpha is a variable)
-fn declare_box_with_variable_parser(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
+fn declare_box_with_variable_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     map(
         tuple((alt((tag("box"), tag("circle"))), space0, variable_parser)),
-        |(x, _, value)| Atom::Keyword((x.to_string(), value.to_string())),
+        |(x, _, value)| Command::DrawShape((x.to_string(), value.to_string())),
+    )(input)
+}
+
+fn declare_box_f32_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
+    map(
+        tuple((alt((tag("box"), tag("circle"))), space0, float)),
+        |(x, _, value): (&str, _, f32)| Command::DrawShapeWf32((x.to_string(), value)),
     )(input)
 }
 
 // it recognizes pattern **move float float**
-fn move_parser(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
+fn move_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     map(
         tuple((tag("move"), space0, float, space0, float)),
-        |(_, _, val1, _, val2)| Atom::Move((val1, val2)),
+        |(_, _, val1, _, val2)| Command::Move((val1, val2)),
     )(input)
 }
 
 // connecting all simple parsers
-pub fn parser(input: &str) -> IResult<&str, Vec<Atom>, VerboseError<&str>> {
+pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
     many0(alt((
         preceded(multispace0, declare_variable_parser),
+        preceded(multispace0, declare_box_f32_parser),
         preceded(multispace0, declare_box_with_variable_parser),
         preceded(multispace0, move_parser),
     )))(input)
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Atom {
-    Keyword((String, String)),
-    Vval((String, f32)),
+pub enum Command {
+    // box x | circle y
+    DrawShape((String, String)),
+    // x: f32
+    DeclareVariable((String, f32)),
+    // move f32 f32
     Move((f32, f32)),
+    DrawShapeWf32((String, f32)),
 }
 
 fn _check_syntax(content: &str) -> bool {
