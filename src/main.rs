@@ -94,7 +94,7 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 
 fn view(app: &App, model: &Model, frame: &Frame) {
     let draw = app.draw();
-    let mut pos: (f32, f32) = (0.0, 0.0);
+    let mut position: (f32, f32) = (0.0, 0.0);
     draw.background().rgb(0.39, 0.39, 0.39);
     for x in &model.instructions {
         match x {
@@ -106,13 +106,13 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                     match x.as_ref() {
                         "box" => {
                             draw.quad()
-                                .x_y(pos.0, pos.1)
+                                .x_y(position.0, position.1)
                                 .w_h(*val, *val)
                                 .color(model.color);
                         }
                         "circle" => {
                             draw.ellipse()
-                                .x_y(pos.0, pos.1)
+                                .x_y(position.0, position.1)
                                 .w_h(*val, *val)
                                 .color(model.color);
                         }
@@ -120,7 +120,11 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                     }
                 }
             }
-            Atom::Move(bufu) => (pos = *bufu),
+            // ?????????????????????????????
+            // Here we assing to position the value of instruction move so we can
+            // draw all our object in the right position
+            //
+            Atom::Move(bufu) => (position = *bufu),
         }
     }
     //
