@@ -99,7 +99,6 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     for x in &model.instructions {
         match x {
             Atom::Vval((_, _)) => {}
-            Atom::Num(_) => (),
             // actually implementing box space0 alpha1 pattern (to recognize "box x", or "box y")
             // it should also cover other patterns
             Atom::Keyword((x, y)) => {
@@ -124,11 +123,6 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             Atom::Move(bufu) => (pos = *bufu),
         }
     }
-    //////////////////////////////////////////////////////////////////////////////
-    //////////////////////////////////////////////////////////////////////////////
-    // TODO: parse the text only on keyboard input
-    //
-    //
     //
     // Write the result of our drawing to the window's frame.
     draw.to_frame(app, &frame).unwrap();
@@ -142,23 +136,18 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
         KeyPressed(key) => {
             if key == nannou::prelude::Key::LControl {
                 println!("{:?}", parser::parser(&model.text_edit));
-                match parser::parser(&model.text_edit) {
-                    Ok(ast) => {
-                        model.instructions = ast.1;
-                        for x in model.instructions.to_owned() {
-                            match x {
-                                Atom::Vval((key, value)) => {
-                                    model.variables.insert(key, value);
-                                }
-                                Atom::Num(_) => (),
-
-                                Atom::Keyword((_, _)) => {}
-
-                                Atom::Move((x, y)) => (model.position = pt2(x, y)),
+                if let Ok((_, ast)) = parser::parser(&model.text_edit) {
+                    model.instructions = ast;
+                    for x in model.instructions.to_owned() {
+                        match x {
+                            Atom::Vval((key, value)) => {
+                                model.variables.insert(key, value);
                             }
+                            Atom::Keyword((_, _)) => {}
+
+                            Atom::Move((x, y)) => (model.position = pt2(x, y)),
                         }
                     }
-                    Err(_) => (),
                 }
             }
         }
