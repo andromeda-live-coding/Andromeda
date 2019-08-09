@@ -96,6 +96,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     let draw = app.draw();
     let mut position: (f32, f32) = (0.0, 0.0);
     draw.background().rgb(0.39, 0.39, 0.39);
+    let mut color = rgb(1.0, 1.0, 1.0);
     for x in &model.instructions {
         match x {
             Command::DeclareVariable((_, _)) => {}
@@ -108,13 +109,13 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                             draw.quad()
                                 .x_y(position.0, position.1)
                                 .w_h(*val, *val)
-                                .color(model.color);
+                                .color(color);
                         }
                         "circle" => {
                             draw.ellipse()
                                 .x_y(position.0, position.1)
                                 .w_h(*val, *val)
-                                .color(model.color);
+                                .color(color);
                         }
                         _ => (),
                     }
@@ -130,16 +131,17 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                     draw.quad()
                         .x_y(position.0, position.1)
                         .w_h(*f32value, *f32value)
-                        .color(model.color);
+                        .color(color);
                 }
                 "circle" => {
                     draw.ellipse()
                         .x_y(position.0, position.1)
                         .w_h(*f32value, *f32value)
-                        .color(model.color);
+                        .color(color);
                 }
                 _ => (),
             },
+            Command::Color((r, g, b)) => (color = rgb(*r, *g, *b)),
         }
     }
     //
@@ -168,6 +170,7 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
 
                                 Command::Move((x, y)) => (model.position = pt2(x, y)),
                                 Command::DrawShapeWf32((_, _)) => (),
+                                Command::Color((_, _, _)) => (),
                             }
                         }
                     }

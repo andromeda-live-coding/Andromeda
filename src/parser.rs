@@ -47,6 +47,13 @@ fn move_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     )(input)
 }
 
+fn color_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
+    map(
+        tuple((tag("color"), space0, float, space0, float, space0, float)),
+        |(_, _, r, _, g, _, b)| Command::Color((r, g, b)),
+    )(input)
+}
+
 // connecting all simple parsers
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
     many0(alt((
@@ -54,6 +61,7 @@ pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
         preceded(multispace0, declare_box_f32_parser),
         preceded(multispace0, declare_box_with_variable_parser),
         preceded(multispace0, move_parser),
+        preceded(multispace0, color_parser),
     )))(input)
 }
 
@@ -66,6 +74,7 @@ pub enum Command {
     // move f32 f32
     Move((f32, f32)),
     DrawShapeWf32((String, f32)),
+    Color((f32, f32, f32)),
 }
 
 fn _check_syntax(content: &str) -> bool {
