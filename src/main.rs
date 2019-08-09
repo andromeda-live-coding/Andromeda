@@ -1,21 +1,14 @@
-// nom
-use nom::branch::alt;
-use nom::bytes::complete::tag;
-use nom::character::complete::{alpha1, multispace0, one_of, space0};
-use nom::combinator::map;
-use nom::error::VerboseError;
-use nom::multi::many0;
-use nom::number::complete::float;
-use nom::sequence::{preceded, tuple};
-use nom::IResult;
+mod parser;
 // nannou
 use nannou::prelude::*;
 use nannou::ui::prelude::*;
 // bufu
 use std::collections::HashMap;
+// Atom
+use parser::Atom;
 
 fn main() {
-    let x = parser(
+    let x = parser::parser(
         "x: 10
                 y: 6
                                 
@@ -222,7 +215,8 @@ fn view(app: &App, model: &Model, frame: &Frame) {
 
     //////////////////////////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////
-    let text_to_parse = parser(&model.text_edit);
+    /// TODO: parse the text only on keyboard input
+    let text_to_parse = parser::parser(&model.text_edit);
     match text_to_parse {
         Ok(ast) => {
             for x in ast.1 {
@@ -343,87 +337,3 @@ fn window_unfocused(_app: &App, _model: &mut Model) {
 }
 
 fn window_closed(_app: &App, _model: &mut Model) {}
-
-// it recognizes a variable name like "x", "y", "xy", "myVariablE"
-fn variable_parser(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
-    map(alpha1, |x: &str| x)(input)
-}
-
-// it recognizes pattern **x: f32**
-fn declare_variable_parser(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
-    map(
-        tuple((variable_parser, one_of(":="), space0, float)),
-        |(name, _, _, value)| Atom::Vval((name.to_string(), value)),
-    )(input)
-}
-
-// it recognizes pattern **box alpha** (where alpha is a variable)
-fn declare_box_with_variable_parser(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
-    map(
-        tuple((alt((tag("box"), tag("circle"))), space0, variable_parser)),
-        |(x, _, value)| Atom::Keyword((x.to_string(), value.to_string())),
-    )(input)
-}
-
-// it recognizes pattern **move float float**
-fn move_parser(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
-    map(
-        tuple((tag("move"), space0, float, space0, float)),
-        |(_, _, val1, _, val2)| Atom::Move((val1, val2)),
-    )(input)
-}
-
-// it recognizes pattern **for digit1 times { expr }**
-fn for_parser() {}
-
-// connecting all simple parsers
-fn parser(input: &str) -> IResult<&str, Vec<Atom>, VerboseError<&str>> {
-    many0(alt((
-        preceded(multispace0, declare_variable_parser),
-        preceded(multispace0, declare_box_with_variable_parser),
-        preceded(multispace0, move_parser),
-    )))(input)
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Atom {
-    Num(f32),
-    Keyword((String, String)),
-    Vval((String, f32)),
-    Move((f32, f32)),
-}
-
-fn check_syntax(content: &str) -> bool {
-    match parser(content) {
-        Ok(not_parsed) => {
-            if not_parsed.0 == "" {
-                true
-            } else {
-                false
-            }
-        }
-        Err(err) => (false),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_valid() {
-        let content = "x: 12.3\nbox x";
-        assert_eq!(check_syntax(content), true);
-    }
-
-    #[test]
-    fn test_invalid_1() {
-        let content = "asldkjasldkjal";
-        assert_eq!(check_syntax(content), false);
-    }
-
-    #[test]
-    fn test_invalid_2() {
-        let content = "x: 123.4\nbox x\n uncorrect syntax";
-        assert_eq!(check_syntax(content), false);
-    }
-}
