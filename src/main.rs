@@ -8,27 +8,6 @@ use std::collections::HashMap;
 use parser::Atom;
 
 fn main() {
-    let x = parser::parser(
-        "x: 10
-                y: 6
-                                
-                                    
-                                    
-                                        
-                                        box x
-                                        
-                                        
-                                        bufu",
-    );
-    match x {
-        Ok(ast) => {
-            for element in ast.1 {
-                println!("{:?}", element);
-            }
-        }
-        Err(_) => (),
-    }
-
     nannou::app(model)
         .event(event)
         .update(update)
@@ -39,23 +18,15 @@ fn main() {
 struct Model {
     ui: Ui,
     ids: Ids,
-    resolution: usize,
-    scale: f32,
-    rotation: f32,
     color: Rgb,
     position: Point2,
     text_edit: String,
-    text: String,
+    variables: HashMap<String, f32>,
+    instructions: Vec<Atom>,
 }
 
 struct Ids {
-    resolution: widget::Id,
-    scale: widget::Id,
-    rotation: widget::Id,
-    random_color: widget::Id,
-    position: widget::Id,
     text_edit: widget::Id,
-    text: widget::Id,
 }
 
 fn model(app: &App) -> Model {
@@ -86,109 +57,33 @@ fn model(app: &App) -> Model {
         .unwrap();
     // Generate some ids for our widgets.
     let ids = Ids {
-        resolution: ui.generate_widget_id(),
-        scale: ui.generate_widget_id(),
-        rotation: ui.generate_widget_id(),
-        random_color: ui.generate_widget_id(),
-        position: ui.generate_widget_id(),
         text_edit: ui.generate_widget_id(),
-        text: ui.generate_widget_id(),
     };
 
     // Init our variables
-    let resolution = 6;
-    let scale = 200.0;
-    let rotation = 0.0;
     let position = pt2(0.0, 0.0);
     let color = rgb(0.9, 0.4, 0.3);
     let text_edit = "bufu".to_owned();
-    let text = "bufu".to_owned();
+    let variables = HashMap::new();
+    let instructions: Vec<Atom> = Vec::new();
+
     Model {
         ui,
         ids,
-        resolution,
-        scale,
-        rotation,
         position,
         color,
         text_edit,
-        text,
+        variables,
+        instructions,
     }
 }
 
 fn update(_app: &App, model: &mut Model, _update: Update) {
     let ui = &mut model.ui.set_widgets();
 
-    fn slider(val: f32, min: f32, max: f32) -> widget::Slider<'static, f32> {
-        widget::Slider::new(val, min, max)
-            .w_h(200.0, 30.0)
-            .label_font_size(15)
-            .rgb(0.3, 0.3, 0.8)
-            .label_rgb(1.0, 1.0, 1.0)
-            .border(0.0)
-    }
-
-    for value in slider(model.resolution as f32, 3.0, 15.0)
-        .top_left_with_margin(20.0)
-        .label("Resolution")
-        .set(model.ids.resolution, ui)
-    {
-        model.resolution = value as usize;
-    }
-
-    for value in slider(model.scale, 10.0, 500.0)
-        .down(10.0)
-        .label("Scale")
-        .set(model.ids.scale, ui)
-    {
-        model.scale = value;
-    }
-
-    for value in slider(model.rotation, -PI, PI)
-        .down(10.0)
-        .label("Rotation")
-        .set(model.ids.rotation, ui)
-    {
-        model.rotation = value;
-    }
-
-    for _click in widget::Button::new()
-        .top_left_with_margin(20.0)
-        .down(10.0)
-        .w_h(200.0, 60.0)
-        .label("Random Color")
-        .label_font_size(15)
-        .rgb(1.0, 0.3, 0.3)
-        .label_rgb(1.0, 1.0, 1.0)
-        .border(0.0)
-        .set(model.ids.random_color, ui)
-    {
-        model.color = rgb(random(), random(), random())
-    }
-
-    for (x, y) in widget::XYPad::new(
-        model.position.x,
-        -200.0,
-        200.0,
-        model.position.y,
-        -200.0,
-        200.0,
-    )
-    .down(10.0)
-    .w_h(200.0, 200.0)
-    .label("Position")
-    .label_font_size(15)
-    .rgb(0.3, 0.3, 0.3)
-    .label_rgb(1.0, 1.0, 1.0)
-    .border(0.0)
-    .set(model.ids.position, ui)
-    {
-        model.position = Point2::new(x, y);
-    }
-
     for edit in widget::TextEdit::new(&model.text_edit)
         .color(color::WHITE)
-        .down(10.0)
+        .top_left_with_margin(10.0)
         .line_spacing(2.5)
         .restrict_to_height(false)
         .set(model.ids.text_edit, ui)
@@ -198,64 +93,43 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 }
 
 fn view(app: &App, model: &Model, frame: &Frame) {
-    // how to declare an HashMap
-    let mut variables: HashMap<String, f32> = HashMap::new();
     let draw = app.draw();
-    let mut position: (f32, f32) = (0.0, 0.0);
-
-    //let t = app.time;
-    draw.background().rgb(0.09, 0.09, 0.09);
-
-    draw.ellipse()
-        .xy(model.position)
-        .radius(model.scale)
-        .resolution(model.resolution)
-        .rotate(model.rotation)
-        .color(model.color);
-
-    //////////////////////////////////////////////////////////////////////////////
-    //////////////////////////////////////////////////////////////////////////////
-    /// TODO: parse the text only on keyboard input
-    let text_to_parse = parser::parser(&model.text_edit);
-    match text_to_parse {
-        Ok(ast) => {
-            for x in ast.1 {
-                match x {
-                    Atom::Vval((key, value)) => {
-                        //draw.quad().w_h(value, value);
-                        variables.insert(key, value);
-                    }
-                    Atom::Num(val_f32) => (),
-                    // actually implementing box space0 alpha1 pattern (to recognize "box x", or "box y")
-                    // it should also cover other patterns
-                    Atom::Keyword((x, y)) => {
-                        if let Some(val) = variables.get(&y) {
-                            match x.as_ref() {
-                                "box" => {
-                                    draw.quad()
-                                        .x_y(position.0, position.1)
-                                        .w_h(*val, *val)
-                                        .color(model.color);
-                                }
-                                "circle" => {
-                                    draw.ellipse()
-                                        .x_y(position.0, position.1)
-                                        .w_h(*val, *val)
-                                        .color(model.color);
-                                }
-                                _ => (),
-                            }
+    let mut pos: (f32, f32) = (0.0, 0.0);
+    draw.background().rgb(0.39, 0.39, 0.39);
+    for x in &model.instructions {
+        match x {
+            Atom::Vval((_, _)) => {}
+            Atom::Num(_) => (),
+            // actually implementing box space0 alpha1 pattern (to recognize "box x", or "box y")
+            // it should also cover other patterns
+            Atom::Keyword((x, y)) => {
+                if let Some(val) = model.variables.get(y) {
+                    match x.as_ref() {
+                        "box" => {
+                            draw.quad()
+                                .x_y(pos.0, pos.1)
+                                .w_h(*val, *val)
+                                .color(model.color);
                         }
-                    }
-                    Atom::Move((x, y)) => {
-                        position = (x, y);
+                        "circle" => {
+                            draw.ellipse()
+                                .x_y(pos.0, pos.1)
+                                .w_h(*val, *val)
+                                .color(model.color);
+                        }
+                        _ => (),
                     }
                 }
             }
+            Atom::Move(bufu) => (pos = *bufu),
         }
-        Err(err) => (),
     }
-
+    //////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////
+    // TODO: parse the text only on keyboard input
+    //
+    //
+    //
     // Write the result of our drawing to the window's frame.
     draw.to_frame(app, &frame).unwrap();
 
@@ -263,11 +137,29 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     model.ui.draw_to_frame(app, &frame).unwrap();
 }
 
-fn window_event(_app: &App, _model: &mut Model, event: WindowEvent) {
+fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
     match event {
         KeyPressed(key) => {
-            if key == nannou::prelude::Key::R {
-                println!("R");
+            if key == nannou::prelude::Key::LControl {
+                println!("{:?}", parser::parser(&model.text_edit));
+                match parser::parser(&model.text_edit) {
+                    Ok(ast) => {
+                        model.instructions = ast.1;
+                        for x in model.instructions.to_owned() {
+                            match x {
+                                Atom::Vval((key, value)) => {
+                                    model.variables.insert(key, value);
+                                }
+                                Atom::Num(_) => (),
+
+                                Atom::Keyword((_, _)) => {}
+
+                                Atom::Move((x, y)) => (model.position = pt2(x, y)),
+                            }
+                        }
+                    }
+                    Err(_) => (),
+                }
             }
         }
         KeyReleased(_key) => {}
@@ -328,12 +220,8 @@ fn window_moved(_app: &App, _model: &mut Model, _pos: Point2) {}
 
 fn window_resized(_app: &App, _model: &mut Model, _dim: Vector2) {}
 
-fn window_focused(_app: &App, _model: &mut Model) {
-    println!("focused!");
-}
+fn window_focused(_app: &App, _model: &mut Model) {}
 
-fn window_unfocused(_app: &App, _model: &mut Model) {
-    println!("unfocused!");
-}
+fn window_unfocused(_app: &App, _model: &mut Model) {}
 
 fn window_closed(_app: &App, _model: &mut Model) {}
