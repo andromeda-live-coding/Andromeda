@@ -2,7 +2,7 @@ mod parser;
 // nannou
 use nannou::prelude::*;
 use nannou::ui::prelude::*;
-// bufu
+// std
 use std::collections::HashMap;
 // Atom
 use parser::Atom;
@@ -136,16 +136,19 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
         KeyPressed(key) => {
             if key == nannou::prelude::Key::LControl {
                 println!("{:?}", parser::parser(&model.text_edit));
-                if let Ok((_, ast)) = parser::parser(&model.text_edit) {
-                    model.instructions = ast;
-                    for x in model.instructions.to_owned() {
-                        match x {
-                            Atom::Vval((key, value)) => {
-                                model.variables.insert(key, value);
-                            }
-                            Atom::Keyword((_, _)) => {}
+                if let Ok((remaining, ast)) = parser::parser(&model.text_edit) {
+                    // updating AST only if parser success and there isn't nothing left to parse
+                    if remaining == "" {
+                        model.instructions = ast;
+                        for x in model.instructions.to_owned() {
+                            match x {
+                                Atom::Vval((key, value)) => {
+                                    model.variables.insert(key, value);
+                                }
+                                Atom::Keyword((_, _)) => {}
 
-                            Atom::Move((x, y)) => (model.position = pt2(x, y)),
+                                Atom::Move((x, y)) => (model.position = pt2(x, y)),
+                            }
                         }
                     }
                 }
