@@ -38,9 +38,6 @@ fn move_parser(input: &str) -> IResult<&str, Atom, VerboseError<&str>> {
     )(input)
 }
 
-// it recognizes pattern **for digit1 times { expr }**
-fn for_parser() {}
-
 // connecting all simple parsers
 pub fn parser(input: &str) -> IResult<&str, Vec<Atom>, VerboseError<&str>> {
     many0(alt((
@@ -52,13 +49,12 @@ pub fn parser(input: &str) -> IResult<&str, Vec<Atom>, VerboseError<&str>> {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Atom {
-    Num(f32),
     Keyword((String, String)),
     Vval((String, f32)),
     Move((f32, f32)),
 }
 
-fn check_syntax(content: &str) -> bool {
+fn _check_syntax(content: &str) -> bool {
     match parser(content) {
         Ok(not_parsed) => {
             if not_parsed.0 == "" {
@@ -67,28 +63,28 @@ fn check_syntax(content: &str) -> bool {
                 false
             }
         }
-        Err(err) => (false),
+        Err(_) => (false),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::_check_syntax;
     #[test]
     fn test_valid() {
         let content = "x: 12.3\nbox x";
-        assert_eq!(check_syntax(content), true);
+        assert_eq!(_check_syntax(content), true);
     }
 
     #[test]
     fn test_invalid_1() {
         let content = "asldkjasldkjal";
-        assert_eq!(check_syntax(content), false);
+        assert_eq!(_check_syntax(content), false);
     }
 
     #[test]
     fn test_invalid_2() {
         let content = "x: 123.4\nbox x\n uncorrect syntax";
-        assert_eq!(check_syntax(content), false);
+        assert_eq!(_check_syntax(content), false);
     }
 }
