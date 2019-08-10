@@ -3,12 +3,12 @@
 // nom
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{alpha1, multispace0, one_of, space0};
+use nom::character::complete::{alpha1, digit1, multispace0, one_of, space0};
 use nom::combinator::map;
 use nom::error::{context, VerboseError};
-use nom::multi::many1;
+use nom::multi::{many0, many1};
 use nom::number::complete::float;
-use nom::sequence::{preceded, tuple};
+use nom::sequence::{delimited, preceded, tuple};
 use nom::IResult;
 
 // it recognizes a variable name like "x", "y", "xy", "myVariablE"
@@ -60,6 +60,21 @@ fn declare_box_f32_f32(input: &str) -> IResult<&str, Command, VerboseError<&str>
     )(input)
 }
 
+fn declare_box_with_2variables(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
+    map(
+        tuple((
+            alt((tag("box"), tag("circle"))),
+            space0,
+            variable_parser,
+            space0,
+            variable_parser,
+        )),
+        |(shape, _, var1, _, var2): (&str, _, &str, _, &str)| {
+            Command::DrawShape2Variables((shape.to_string(), var1.to_string(), var2.to_string()))
+        },
+    )(input)
+}
+
 // it recognizes pattern **move float float**
 fn move_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     map(
@@ -76,35 +91,54 @@ fn color_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     )(input)
 }
 
+fn for_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
+    map(
+        tuple((
+            tag("for"),
+            space0,
+            digit1,
+            space0,
+            delimited(tag("("), parser, tag(")")),
+        )),
+        |(_, _, times, _, v): (_, _, &str, _, Vec<Command>)| Command::For((times.to_string(), v)),
+    )(input)
+}
+
 // connecting all simple parsers
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
-    context(
-        "bufu2",
-        many1(alt((
-            preceded(multispace0, declare_variable_parser),
-            preceded(multispace0, declare_box_f32_f32),
-            preceded(multispace0, declare_box_f32_parser),
-            preceded(multispace0, declare_box_with_variable_parser),
-            preceded(multispace0, declare_box),
-            preceded(multispace0, move_parser),
-            preceded(multispace0, color_parser),
-        ))),
-    )(input)
+    many0(alt((
+        preceded(multispace0, for_parser),
+        preceded(multispace0, declare_variable_parser),
+        preceded(multispace0, declare_box_with_2variables),
+        preceded(multispace0, declare_box_f32_f32),
+        preceded(multispace0, declare_box_f32_parser),
+        preceded(multispace0, declare_box_with_variable_parser),
+        preceded(multispace0, declare_box),
+        preceded(multispace0, move_parser),
+        preceded(multispace0, color_parser),
+    )))(input)
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Command {
+    // x: f32
+    DeclareVariable((String, f32)),
     // box | circle
     DrawShape(String),
     // box x | circle y
     DrawShapeWVariable((String, String)),
-    // x: f32
-    DeclareVariable((String, f32)),
+    // box f32
+    DrawShapeWf32((String, f32)),
+    // box f32 f32
+    DrawShapeWf32f32((String, f32, f32)),
+    // box x y
+    DrawShape2Variables((String, String, String)),
     // move f32 f32
     Move((f32, f32)),
-    DrawShapeWf32((String, f32)),
-    DrawShapeWf32f32((String, f32, f32)),
+    // color f32 f32 f32
     Color((f32, f32, f32)),
+
+    For((String, Vec<Command>)),
 }
 
 fn _check_syntax(content: &str) -> bool {

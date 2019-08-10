@@ -1,12 +1,13 @@
 mod parser;
 // nannou
+use nannou::app::Draw;
 use nannou::prelude::*;
 use nannou::ui::prelude::*;
 // std
 use std::collections::HashMap;
 // Atom
+use colored::*;
 use parser::Command;
-
 fn main() {
     nannou::app(model)
         .event(event)
@@ -18,7 +19,6 @@ fn main() {
 struct Model {
     ui: Ui,
     ids: Ids,
-    color: Rgb,
     position: Point2,
     text_edit: String,
     variables: HashMap<String, f32>,
@@ -62,7 +62,6 @@ fn model(app: &App) -> Model {
 
     // Init our variables
     let position = pt2(0.0, 0.0);
-    let color = rgb(0.9, 0.4, 0.3);
     let text_edit = "bufu".to_owned();
     let variables = HashMap::new();
     let instructions: Vec<Command> = Vec::new();
@@ -71,7 +70,6 @@ fn model(app: &App) -> Model {
         ui,
         ids,
         position,
-        color,
         text_edit,
         variables,
         instructions,
@@ -95,7 +93,7 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 fn view(app: &App, model: &Model, frame: &Frame) {
     let draw = app.draw();
     let mut position: (f32, f32) = (0.0, 0.0);
-    let mut std_value = 40.0;
+    let std_value = 10.0;
     draw.background().rgb(0.39, 0.39, 0.39);
     let mut color = rgb(1.0, 1.0, 1.0);
     for x in &model.instructions {
@@ -103,76 +101,123 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             Command::DeclareVariable((_, _)) => {}
             // actually implementing box space0 alpha1 pattern (to recognize "box x", or "box y")
             // it should also cover other patterns
-            Command::DrawShapeWVariable((x, y)) => {
+            Command::DrawShapeWVariable((shape, y)) => {
                 if let Some(val) = model.variables.get(y) {
-                    match x.as_ref() {
-                        "box" => {
-                            draw.quad()
-                                .x_y(position.0, position.1)
-                                .w_h(*val, *val)
-                                .color(color);
-                        }
-                        "circle" => {
-                            draw.ellipse()
-                                .x_y(position.0, position.1)
-                                .w_h(*val, *val)
-                                .color(color);
-                        }
-                        _ => (),
-                    }
+                    c(
+                        &draw,
+                        shape.as_ref(),
+                        &position.0,
+                        &position.1,
+                        val,
+                        val,
+                        (color.red, color.green, color.blue),
+                    );
                 }
             }
             // ?????????????????????????????
             // Here we assing to position the value of instruction move so we can
             // draw all our object in the right position
             //
-            Command::Move(bufu) => (position = *bufu),
-            Command::DrawShapeWf32((shape, f32value)) => match shape.as_ref() {
-                "box" => {
-                    draw.quad()
-                        .x_y(position.0, position.1)
-                        .w_h(*f32value, *f32value)
-                        .color(color);
-                }
-                "circle" => {
-                    draw.ellipse()
-                        .x_y(position.0, position.1)
-                        .w_h(*f32value, *f32value)
-                        .color(color);
-                }
-                _ => (),
-            },
+            Command::Move(bufu) => {
+                position.0 = position.0 + bufu.0;
+                position.1 = position.1 + bufu.1;
+            }
+            Command::DrawShapeWf32((shape, f32value)) => {
+                c(
+                    &draw,
+                    shape.as_ref(),
+                    &position.0,
+                    &position.1,
+                    f32value,
+                    f32value,
+                    (color.red, color.green, color.blue),
+                );
+            }
             Command::Color((r, g, b)) => (color = rgb(*r, *g, *b)),
-            Command::DrawShape(shape) => match shape.as_ref() {
-                "box" => {
-                    draw.quad()
-                        .x_y(position.0, position.1)
-                        .w_h(std_value, std_value)
-                        .color(color);
+            Command::DrawShape(shape) => {
+                c(
+                    &draw,
+                    shape.as_ref(),
+                    &position.0,
+                    &position.1,
+                    &std_value,
+                    &std_value,
+                    (color.red, color.green, color.blue),
+                );
+            }
+            Command::DrawShapeWf32f32((shape, val1, val2)) => {
+                c(
+                    &draw,
+                    shape.as_ref(),
+                    &position.0,
+                    &position.1,
+                    val1,
+                    val2,
+                    (color.red, color.green, color.blue),
+                );
+            }
+            Command::DrawShape2Variables((shape, var1, var2)) => {
+                if let Some(val1) = model.variables.get(var1) {
+                    if let Some(val2) = model.variables.get(var2) {
+                        c(
+                            &draw,
+                            shape.as_ref(),
+                            &position.0,
+                            &position.1,
+                            val1,
+                            val2,
+                            (color.red, color.green, color.blue),
+                        );
+                    }
                 }
-                "circle" => {
-                    draw.ellipse()
-                        .x_y(position.0, position.1)
-                        .w_h(std_value, std_value)
-                        .color(color);
+            }
+            Command::For((times, v)) => {
+                let mut tmpHashMap = HashMap::new();
+                let times = times.parse::<i32>().unwrap();
+                for n in 0..times {
+                    for cmd in v {
+                        match cmd {
+                            Command::DeclareVariable((key, value)) => {
+                                tmpHashMap.insert(key.to_string(), *value);
+                            }
+                            Command::DrawShapeWVariable((shape, y)) => {
+                                if let Some(val) = model.variables.get(y) {
+                                    c(
+                                        &draw,
+                                        shape.as_ref(),
+                                        &position.0,
+                                        &position.1,
+                                        val,
+                                        val,
+                                        (color.red, color.green, color.blue),
+                                    );
+                                }
+                            }
+
+                            Command::Move((x, y)) => {
+                                position.0 = position.0 + x;
+                                position.1 = position.1 + y;
+                            }
+                            Command::DrawShapeWf32((shape, f32value)) => {
+                                c(
+                                    &draw,
+                                    shape.as_ref(),
+                                    &position.0,
+                                    &position.1,
+                                    f32value,
+                                    f32value,
+                                    (color.red, color.green, color.blue),
+                                );
+                            }
+                            Command::Color(_) => (),
+                            Command::DrawShape(_) => (),
+                            Command::DrawShapeWf32f32(_) => (),
+                            Command::DrawShape2Variables(_) => (),
+                            _ => (),
+                        }
+                    }
                 }
-                _ => (),
-            },
-            Command::DrawShapeWf32f32((shape, val1, val2)) => match shape.as_ref() {
-                "box" => {
-                    draw.quad()
-                        .x_y(position.0, position.1)
-                        .w_h(*val1, *val2)
-                        .color(color);
-                }
-                "circle" => {
-                    draw.ellipse()
-                        .x_y(position.0, position.1)
-                        .w_h(*val1, *val2)
-                        .color(color);
-                }
-                _ => (),
-            },
+            }
         }
     }
     //
@@ -181,14 +226,33 @@ fn view(app: &App, model: &Model, frame: &Frame) {
 
     // Draw the state of the `Ui` to the frame.
     model.ui.draw_to_frame(app, &frame).unwrap();
+
+    fn c(d: &Draw, shape: &str, x: &f32, y: &f32, val1: &f32, val2: &f32, color: (f32, f32, f32)) {
+        match shape {
+            "box" => {
+                d.quad()
+                    .x_y(*x, *y)
+                    .w_h(*val1, *val2)
+                    .color(rgb(color.0, color.1, color.2));
+            }
+            "circle" => {
+                d.ellipse()
+                    .x_y(*x, *y)
+                    .w_h(*val1, *val2)
+                    .color(rgb(color.0, color.1, color.2));
+            }
+            _ => (),
+        }
+    }
 }
 
 fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
     match event {
         KeyPressed(key) => {
             if key == nannou::prelude::Key::LControl {
-                println!("{:#?}", parser::parser(&model.text_edit));
                 if let Ok((remaining, ast)) = parser::parser(&model.text_edit) {
+                    println!("{:#?}", parser::parser(&model.text_edit));
+
                     // updating AST only if parser success and there isn't nothing left to parse
                     if remaining == "" {
                         model.instructions = ast;
@@ -204,10 +268,14 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                                 Command::Color(_) => (),
                                 Command::DrawShape(_) => (),
                                 Command::DrawShapeWf32f32(_) => (),
+                                Command::DrawShape2Variables(_) => (),
+                                Command::For((times, v)) => {}
                             }
                         }
                     } else {
                         println!("not updating AST");
+                        println!("{:#?}", parser::parser(&model.text_edit));
+                        println!("error: {}", &remaining.red());
                     }
                 }
             }
