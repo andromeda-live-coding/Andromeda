@@ -5,8 +5,8 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, multispace0, one_of, space0};
 use nom::combinator::map;
-use nom::error::VerboseError;
-use nom::multi::many0;
+use nom::error::{context, VerboseError};
+use nom::multi::many1;
 use nom::number::complete::float;
 use nom::sequence::{preceded, tuple};
 use nom::IResult;
@@ -45,6 +45,21 @@ fn declare_box_f32_parser(input: &str) -> IResult<&str, Command, VerboseError<&s
     )(input)
 }
 
+fn declare_box_f32_f32(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
+    map(
+        tuple((
+            alt((tag("box"), tag("circle"))),
+            space0,
+            float,
+            space0,
+            float,
+        )),
+        |(shape, _, val1, _, val2): (&str, _, _, _, _)| {
+            Command::DrawShapeWf32f32((shape.to_string(), val1, val2))
+        },
+    )(input)
+}
+
 // it recognizes pattern **move float float**
 fn move_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     map(
@@ -63,14 +78,18 @@ fn color_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
 
 // connecting all simple parsers
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
-    many0(alt((
-        preceded(multispace0, declare_variable_parser),
-        preceded(multispace0, declare_box_f32_parser),
-        preceded(multispace0, declare_box_with_variable_parser),
-        preceded(multispace0, declare_box),
-        preceded(multispace0, move_parser),
-        preceded(multispace0, color_parser),
-    )))(input)
+    context(
+        "bufu2",
+        many1(alt((
+            preceded(multispace0, declare_variable_parser),
+            preceded(multispace0, declare_box_f32_f32),
+            preceded(multispace0, declare_box_f32_parser),
+            preceded(multispace0, declare_box_with_variable_parser),
+            preceded(multispace0, declare_box),
+            preceded(multispace0, move_parser),
+            preceded(multispace0, color_parser),
+        ))),
+    )(input)
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -84,6 +103,7 @@ pub enum Command {
     // move f32 f32
     Move((f32, f32)),
     DrawShapeWf32((String, f32)),
+    DrawShapeWf32f32((String, f32, f32)),
     Color((f32, f32, f32)),
 }
 

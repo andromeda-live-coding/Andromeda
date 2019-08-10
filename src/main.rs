@@ -158,6 +158,21 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                 }
                 _ => (),
             },
+            Command::DrawShapeWf32f32((shape, val1, val2)) => match shape.as_ref() {
+                "box" => {
+                    draw.quad()
+                        .x_y(position.0, position.1)
+                        .w_h(*val1, *val2)
+                        .color(color);
+                }
+                "circle" => {
+                    draw.ellipse()
+                        .x_y(position.0, position.1)
+                        .w_h(*val1, *val2)
+                        .color(color);
+                }
+                _ => (),
+            },
         }
     }
     //
@@ -172,7 +187,7 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
     match event {
         KeyPressed(key) => {
             if key == nannou::prelude::Key::LControl {
-                println!("{:?}", parser::parser(&model.text_edit));
+                println!("{:#?}", parser::parser(&model.text_edit));
                 if let Ok((remaining, ast)) = parser::parser(&model.text_edit) {
                     // updating AST only if parser success and there isn't nothing left to parse
                     if remaining == "" {
@@ -188,6 +203,7 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                                 Command::DrawShapeWf32(_) => (),
                                 Command::Color(_) => (),
                                 Command::DrawShape(_) => (),
+                                Command::DrawShapeWf32f32(_) => (),
                             }
                         }
                     } else {
