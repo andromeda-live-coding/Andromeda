@@ -172,13 +172,13 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                 }
             }
             Command::For((times, v)) => {
-                let mut tmpHashMap = HashMap::new();
                 let times = times.parse::<i32>().unwrap();
+                let mut tmp_hash_map = HashMap::new();
                 for n in 0..times {
                     for cmd in v {
                         match cmd {
                             Command::DeclareVariable((key, value)) => {
-                                tmpHashMap.insert(key.to_string(), *value);
+                                tmp_hash_map.insert(key.to_string(), value);
                             }
                             Command::DrawShapeWVariable((shape, y)) => {
                                 if let Some(val) = model.variables.get(y) {
@@ -204,8 +204,8 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                     shape.as_ref(),
                                     &position.0,
                                     &position.1,
-                                    f32value,
-                                    f32value,
+                                    &f32value,
+                                    &f32value,
                                     (color.red, color.green, color.blue),
                                 );
                             }
@@ -213,7 +213,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                             Command::DrawShape(_) => (),
                             Command::DrawShapeWf32f32(_) => (),
                             Command::DrawShape2Variables(_) => (),
-                            _ => (),
+                            Command::For(_) => (),
                         }
                     }
                 }
@@ -227,6 +227,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     // Draw the state of the `Ui` to the frame.
     model.ui.draw_to_frame(app, &frame).unwrap();
 
+    // inner function used to draw
     fn c(d: &Draw, shape: &str, x: &f32, y: &f32, val1: &f32, val2: &f32, color: (f32, f32, f32)) {
         match shape {
             "box" => {
@@ -252,7 +253,7 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
             if key == nannou::prelude::Key::LControl {
                 if let Ok((remaining, ast)) = parser::parser(&model.text_edit) {
                     println!("{:#?}", parser::parser(&model.text_edit));
-
+                    // forse posso fare tutto nella view e togliere questa visiti all'albero
                     // updating AST only if parser success and there isn't nothing left to parse
                     if remaining == "" {
                         model.instructions = ast;
@@ -262,14 +263,14 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                                     model.variables.insert(key, value);
                                 }
                                 Command::DrawShapeWVariable(_) => {}
-
-                                Command::Move((x, y)) => (model.position = pt2(x, y)),
+                                Command::Move(_) => {}
+                                //Command::Move((x, y)) => (model.position = pt2(x, y)),
                                 Command::DrawShapeWf32(_) => (),
                                 Command::Color(_) => (),
                                 Command::DrawShape(_) => (),
                                 Command::DrawShapeWf32f32(_) => (),
                                 Command::DrawShape2Variables(_) => (),
-                                Command::For((times, v)) => {}
+                                Command::For(_) => {}
                             }
                         }
                     } else {
