@@ -24,11 +24,17 @@ fn declare_variable_parser(input: &str) -> IResult<&str, Command, VerboseError<&
     )(input)
 }
 
+fn declare_box(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
+    map(alt((tag("box"), tag("circle"))), |shape: &str| {
+        Command::DrawShape(shape.to_string())
+    })(input)
+}
+
 // it recognizes pattern **box alpha** (where alpha is a variable)
 fn declare_box_with_variable_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     map(
         tuple((alt((tag("box"), tag("circle"))), space0, variable_parser)),
-        |(x, _, value)| Command::DrawShape((x.to_string(), value.to_string())),
+        |(x, _, value)| Command::DrawShapeWVariable((x.to_string(), value.to_string())),
     )(input)
 }
 
@@ -47,6 +53,7 @@ fn move_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     )(input)
 }
 
+// it recognizes pattern **color f32 f32 f32**
 fn color_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     map(
         tuple((tag("color"), space0, float, space0, float, space0, float)),
@@ -60,6 +67,7 @@ pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
         preceded(multispace0, declare_variable_parser),
         preceded(multispace0, declare_box_f32_parser),
         preceded(multispace0, declare_box_with_variable_parser),
+        preceded(multispace0, declare_box),
         preceded(multispace0, move_parser),
         preceded(multispace0, color_parser),
     )))(input)
@@ -67,8 +75,10 @@ pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Command {
+    // box | circle
+    DrawShape(String),
     // box x | circle y
-    DrawShape((String, String)),
+    DrawShapeWVariable((String, String)),
     // x: f32
     DeclareVariable((String, f32)),
     // move f32 f32

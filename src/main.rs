@@ -95,6 +95,7 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 fn view(app: &App, model: &Model, frame: &Frame) {
     let draw = app.draw();
     let mut position: (f32, f32) = (0.0, 0.0);
+    let mut std_value = 40.0;
     draw.background().rgb(0.39, 0.39, 0.39);
     let mut color = rgb(1.0, 1.0, 1.0);
     for x in &model.instructions {
@@ -102,7 +103,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             Command::DeclareVariable((_, _)) => {}
             // actually implementing box space0 alpha1 pattern (to recognize "box x", or "box y")
             // it should also cover other patterns
-            Command::DrawShape((x, y)) => {
+            Command::DrawShapeWVariable((x, y)) => {
                 if let Some(val) = model.variables.get(y) {
                     match x.as_ref() {
                         "box" => {
@@ -142,6 +143,21 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                 _ => (),
             },
             Command::Color((r, g, b)) => (color = rgb(*r, *g, *b)),
+            Command::DrawShape(shape) => match shape.as_ref() {
+                "box" => {
+                    draw.quad()
+                        .x_y(position.0, position.1)
+                        .w_h(std_value, std_value)
+                        .color(color);
+                }
+                "circle" => {
+                    draw.ellipse()
+                        .x_y(position.0, position.1)
+                        .w_h(std_value, std_value)
+                        .color(color);
+                }
+                _ => (),
+            },
         }
     }
     //
@@ -166,13 +182,16 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                                 Command::DeclareVariable((key, value)) => {
                                     model.variables.insert(key, value);
                                 }
-                                Command::DrawShape((_, _)) => {}
+                                Command::DrawShapeWVariable(_) => {}
 
                                 Command::Move((x, y)) => (model.position = pt2(x, y)),
-                                Command::DrawShapeWf32((_, _)) => (),
-                                Command::Color((_, _, _)) => (),
+                                Command::DrawShapeWf32(_) => (),
+                                Command::Color(_) => (),
+                                Command::DrawShape(_) => (),
                             }
                         }
+                    } else {
+                        println!("not updating AST");
                     }
                 }
             }
