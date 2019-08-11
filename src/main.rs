@@ -103,7 +103,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             // it should also cover other patterns
             Command::DrawShapeWVariable((shape, y)) => {
                 if let Some(val) = model.variables.get(y) {
-                    c(
+                    draw_shape(
                         &draw,
                         shape.as_ref(),
                         &position.0,
@@ -123,7 +123,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                 position.1 = position.1 + bufu.1;
             }
             Command::DrawShapeWf32((shape, f32value)) => {
-                c(
+                draw_shape(
                     &draw,
                     shape.as_ref(),
                     &position.0,
@@ -135,7 +135,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             }
             Command::Color((r, g, b)) => (color = rgb(*r, *g, *b)),
             Command::DrawShape(shape) => {
-                c(
+                draw_shape(
                     &draw,
                     shape.as_ref(),
                     &position.0,
@@ -146,7 +146,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                 );
             }
             Command::DrawShapeWf32f32((shape, val1, val2)) => {
-                c(
+                draw_shape(
                     &draw,
                     shape.as_ref(),
                     &position.0,
@@ -159,7 +159,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             Command::DrawShape2Variables((shape, var1, var2)) => {
                 if let Some(val1) = model.variables.get(var1) {
                     if let Some(val2) = model.variables.get(var2) {
-                        c(
+                        draw_shape(
                             &draw,
                             shape.as_ref(),
                             &position.0,
@@ -169,6 +169,32 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                             (color.red, color.green, color.blue),
                         );
                     }
+                }
+            }
+            Command::DrawShapeVf32((shape, var, val2)) => {
+                if let Some(val1) = model.variables.get(var) {
+                    draw_shape(
+                        &draw,
+                        shape.as_ref(),
+                        &position.0,
+                        &position.1,
+                        val1,
+                        val2,
+                        (color.red, color.green, color.blue),
+                    );
+                }
+            }
+            Command::DrawShapef32V((shape, val1, var)) => {
+                if let Some(val2) = model.variables.get(var) {
+                    draw_shape(
+                        &draw,
+                        shape.as_ref(),
+                        &position.0,
+                        &position.1,
+                        val1,
+                        val2,
+                        (color.red, color.green, color.blue),
+                    );
                 }
             }
             Command::For((times, v)) => {
@@ -182,7 +208,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                             }
                             Command::DrawShapeWVariable((shape, y)) => {
                                 if let Some(val) = model.variables.get(y) {
-                                    c(
+                                    draw_shape(
                                         &draw,
                                         shape.as_ref(),
                                         &position.0,
@@ -199,7 +225,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                 position.1 = position.1 + y;
                             }
                             Command::DrawShapeWf32((shape, f32value)) => {
-                                c(
+                                draw_shape(
                                     &draw,
                                     shape.as_ref(),
                                     &position.0,
@@ -214,6 +240,8 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                             Command::DrawShapeWf32f32(_) => (),
                             Command::DrawShape2Variables(_) => (),
                             Command::For(_) => (),
+                            Command::DrawShapeVf32(_) => (),
+                            Command::DrawShapef32V(_) => (),
                         }
                     }
                 }
@@ -228,16 +256,24 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     model.ui.draw_to_frame(app, &frame).unwrap();
 
     // inner function used to draw
-    fn c(d: &Draw, shape: &str, x: &f32, y: &f32, val1: &f32, val2: &f32, color: (f32, f32, f32)) {
+    fn draw_shape(
+        c: &Draw,
+        shape: &str,
+        x: &f32,
+        y: &f32,
+        val1: &f32,
+        val2: &f32,
+        color: (f32, f32, f32),
+    ) {
         match shape {
             "box" => {
-                d.quad()
+                c.quad()
                     .x_y(*x, *y)
                     .w_h(*val1, *val2)
                     .color(rgb(color.0, color.1, color.2));
             }
             "circle" => {
-                d.ellipse()
+                c.ellipse()
                     .x_y(*x, *y)
                     .w_h(*val1, *val2)
                     .color(rgb(color.0, color.1, color.2));
@@ -253,7 +289,6 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
             if key == nannou::prelude::Key::LControl {
                 if let Ok((remaining, ast)) = parser::parser(&model.text_edit) {
                     println!("{:#?}", parser::parser(&model.text_edit));
-                    // forse posso fare tutto nella view e togliere questa visiti all'albero
                     // updating AST only if parser success and there isn't nothing left to parse
                     if remaining == "" {
                         model.instructions = ast;
@@ -262,21 +297,13 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                                 Command::DeclareVariable((key, value)) => {
                                     model.variables.insert(key, value);
                                 }
-                                Command::DrawShapeWVariable(_) => {}
-                                Command::Move(_) => {}
-                                //Command::Move((x, y)) => (model.position = pt2(x, y)),
-                                Command::DrawShapeWf32(_) => (),
-                                Command::Color(_) => (),
-                                Command::DrawShape(_) => (),
-                                Command::DrawShapeWf32f32(_) => (),
-                                Command::DrawShape2Variables(_) => (),
-                                Command::For(_) => {}
+                                _ => (),
                             }
                         }
                     } else {
                         println!("not updating AST");
                         println!("{:#?}", parser::parser(&model.text_edit));
-                        println!("error: {}", &remaining.red());
+                        println!("{}", &remaining.red());
                     }
                 }
             }

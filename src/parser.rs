@@ -75,6 +75,36 @@ fn declare_box_with_2variables(input: &str) -> IResult<&str, Command, VerboseErr
     )(input)
 }
 
+fn declare_box_with_var_f32(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
+    map(
+        tuple((
+            alt((tag("box"), tag("circle"))),
+            space0,
+            variable_parser,
+            space0,
+            float,
+        )),
+        |(shape, _, var1, _, val2): (&str, _, &str, _, f32)| {
+            Command::DrawShapeVf32((shape.to_string(), var1.to_string(), val2))
+        },
+    )(input)
+}
+
+fn declare_box_with_f32_var(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
+    map(
+        tuple((
+            alt((tag("box"), tag("circle"))),
+            space0,
+            float,
+            space0,
+            variable_parser,
+        )),
+        |(shape, _, val1, _, var2): (&str, _, f32, _, &str)| {
+            Command::DrawShapef32V((shape.to_string(), val1, var2.to_string()))
+        },
+    )(input)
+}
+
 // it recognizes pattern **move float float**
 fn move_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     map(
@@ -108,6 +138,8 @@ fn for_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
     many0(alt((
         preceded(multispace0, for_parser),
+        preceded(multispace0, declare_box_with_f32_var),
+        preceded(multispace0, declare_box_with_var_f32),
         preceded(multispace0, declare_variable_parser),
         preceded(multispace0, declare_box_with_2variables),
         preceded(multispace0, declare_box_f32_f32),
@@ -133,6 +165,9 @@ pub enum Command {
     DrawShapeWf32f32((String, f32, f32)),
     // box x y
     DrawShape2Variables((String, String, String)),
+
+    DrawShapeVf32((String, String, f32)),
+    DrawShapef32V((String, f32, String)),
     // move f32 f32
     Move((f32, f32)),
     // color f32 f32 f32
