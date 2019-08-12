@@ -297,13 +297,35 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                                 Command::DeclareVariable((key, value)) => {
                                     model.variables.insert(key, value);
                                 }
+                                Command::DrawShape2Variables((shape, var1, var2)) => {
+                                    if let Some(val) = model.variables.get(&var1) {
+                                        if let Some(val2) = model.variables.get(&var2) {
+                                            println!("ok");
+                                        }
+                                    }
+                                }
+                                Command::DrawShapeVf32((shape, var, val)) => {
+                                    if let Some(val) = model.variables.get(&var) {
+                                        println!("ok");
+                                    }
+                                }
+                                Command::DrawShapeWVariable((shape, var)) => {
+                                    if let Some(val) = model.variables.get(&var) {
+                                        println!("ok");
+                                    }
+                                }
+                                Command::DrawShapef32V((shape, val1, var)) => {
+                                    if let Some(val) = model.variables.get(&var) {
+                                        println!("ok");
+                                    }
+                                }
                                 _ => (),
                             }
                         }
                     } else {
                         println!("not updating AST");
                         println!("{:#?}", parser::parser(&model.text_edit));
-                        println!("{}", &remaining.red());
+                        println!("error: {}", &remaining.red());
                     }
                 }
             }
