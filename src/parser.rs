@@ -8,7 +8,7 @@ use nom::combinator::map;
 use nom::error::{context, VerboseError};
 use nom::multi::{many0, many1};
 use nom::number::complete::float;
-use nom::sequence::{delimited, preceded, tuple};
+use nom::sequence::{delimited, preceded, terminated, tuple};
 use nom::IResult;
 
 // it recognizes a variable name like "x", "y", "xy", "myVariablE"
@@ -136,19 +136,22 @@ fn for_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
 
 // connecting all simple parsers
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
-    many0(alt((
-        preceded(multispace0, for_parser),
-        preceded(multispace0, declare_box_with_f32_var),
-        preceded(multispace0, declare_box_with_var_f32),
-        preceded(multispace0, declare_variable_parser),
-        preceded(multispace0, declare_box_with_2variables),
-        preceded(multispace0, declare_box_f32_f32),
-        preceded(multispace0, declare_box_f32_parser),
-        preceded(multispace0, declare_box_with_variable_parser),
-        preceded(multispace0, declare_box),
-        preceded(multispace0, move_parser),
-        preceded(multispace0, color_parser),
-    )))(input)
+    many0(terminated(
+        alt((
+            preceded(multispace0, for_parser),
+            preceded(multispace0, declare_box_with_f32_var),
+            preceded(multispace0, declare_box_with_var_f32),
+            preceded(multispace0, declare_variable_parser),
+            preceded(multispace0, declare_box_with_2variables),
+            preceded(multispace0, declare_box_f32_f32),
+            preceded(multispace0, declare_box_f32_parser),
+            preceded(multispace0, declare_box_with_variable_parser),
+            preceded(multispace0, declare_box),
+            preceded(multispace0, move_parser),
+            preceded(multispace0, color_parser),
+        )),
+        multispace0,
+    ))(input)
 }
 
 #[derive(Debug, PartialEq, Clone)]

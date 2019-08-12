@@ -19,7 +19,6 @@ fn main() {
 struct Model {
     ui: Ui,
     ids: Ids,
-    position: Point2,
     text_edit: String,
     variables: HashMap<String, f32>,
     instructions: Vec<Command>,
@@ -69,7 +68,6 @@ fn model(app: &App) -> Model {
     Model {
         ui,
         ids,
-        position,
         text_edit,
         variables,
         instructions,
@@ -287,40 +285,58 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
     match event {
         KeyPressed(key) => {
             if key == nannou::prelude::Key::LControl {
+                model.variables = HashMap::new();
                 if let Ok((remaining, ast)) = parser::parser(&model.text_edit) {
                     println!("{:#?}", parser::parser(&model.text_edit));
-                    // updating AST only if parser success and there isn't nothing left to parse
                     if remaining == "" {
-                        model.instructions = ast;
+                        let mut semantic_analysis = true;
+                        //model.instructions = ast;
                         for x in model.instructions.to_owned() {
                             match x {
                                 Command::DeclareVariable((key, value)) => {
                                     model.variables.insert(key, value);
                                 }
-                                Command::DrawShape2Variables((shape, var1, var2)) => {
-                                    if let Some(val) = model.variables.get(&var1) {
-                                        if let Some(val2) = model.variables.get(&var2) {
-                                            println!("ok");
+                                Command::DrawShape2Variables((_, var1, var2)) => {
+                                    if let Some(_) = model.variables.get(&var1) {
+                                        if let Some(_) = model.variables.get(&var2) {
+                                        } else {
+                                            semantic_analysis = false;
+                                            println!("error on variables: {}", var2);
                                         }
+                                    } else {
+                                        semantic_analysis = false;
+                                        println!("error on variables: {}", var1);
                                     }
                                 }
-                                Command::DrawShapeVf32((shape, var, val)) => {
-                                    if let Some(val) = model.variables.get(&var) {
-                                        println!("ok");
+                                Command::DrawShapeVf32((_, var, val)) => {
+                                    if let Some(_) = model.variables.get(&var) {
+                                    } else {
+                                        semantic_analysis = false;
+                                        println!("error on variable: {}", val);
                                     }
                                 }
-                                Command::DrawShapeWVariable((shape, var)) => {
-                                    if let Some(val) = model.variables.get(&var) {
-                                        println!("ok");
+                                Command::DrawShapeWVariable((_, var)) => {
+                                    if let Some(_) = model.variables.get(&var) {
+                                    } else {
+                                        semantic_analysis = false;
+                                        println!("error on variable: {}", var);
                                     }
                                 }
-                                Command::DrawShapef32V((shape, val1, var)) => {
-                                    if let Some(val) = model.variables.get(&var) {
-                                        println!("ok");
+                                Command::DrawShapef32V((_, _, var)) => {
+                                    if let Some(_) = model.variables.get(&var) {
+                                    } else {
+                                        semantic_analysis = false;
+                                        println!("error on variables: {}", var);
                                     }
                                 }
                                 _ => (),
                             }
+                        }
+                        /////// IL PROBLEMA E' CHE QUANDO VALIDO LA STRUTTURA, LA PRIMA VOLTA NON COPIO GLI ELEMENTI DENTRO AL MODEL QUINDI NON DISEGNA
+
+                        // updating AST only if parser success and there isn't nothing left to parse
+                        if semantic_analysis {
+                            model.instructions = ast;
                         }
                     } else {
                         println!("not updating AST");
