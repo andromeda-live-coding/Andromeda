@@ -113,6 +113,10 @@ fn move_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     )(input)
 }
 
+fn reset_move_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
+    map(tag("reset_m"), |_| Command::ResetMove)(input)
+}
+
 // it recognizes pattern **color f32 f32 f32**
 fn color_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     map(
@@ -148,6 +152,7 @@ pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
             preceded(multispace0, declare_box_with_variable_parser),
             preceded(multispace0, declare_box),
             preceded(multispace0, move_parser),
+            preceded(multispace0, reset_move_parser),
             preceded(multispace0, color_parser),
         )),
         multispace0,
@@ -173,6 +178,7 @@ pub enum Command {
     DrawShapef32V((String, f32, String)),
     // move f32 f32
     Move((f32, f32)),
+    ResetMove,
     // color f32 f32 f32
     Color((f32, f32, f32)),
 

@@ -120,6 +120,11 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                 position.0 = position.0 + bufu.0;
                 position.1 = position.1 + bufu.1;
             }
+
+            Command::ResetMove => {
+                position.0 = 0.0;
+                position.1 = 0.0;
+            }
             Command::DrawShapeWf32((shape, f32value)) => {
                 draw_shape(
                     &draw,
@@ -222,6 +227,10 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                 position.0 = position.0 + x;
                                 position.1 = position.1 + y;
                             }
+                            Command::ResetMove => {
+                                position.0 = 0.0;
+                                position.1 = 0.0;
+                            }
                             Command::DrawShapeWf32((shape, f32value)) => {
                                 draw_shape(
                                     &draw,
@@ -291,7 +300,7 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                     if remaining == "" {
                         let mut semantic_analysis = true;
                         //model.instructions = ast;
-                        for x in model.instructions.to_owned() {
+                        for x in ast.to_owned() {
                             match x {
                                 Command::DeclareVariable((key, value)) => {
                                     model.variables.insert(key, value);
