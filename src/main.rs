@@ -6,7 +6,7 @@ use nannou::ui::prelude::*;
 // std
 use std::collections::HashMap;
 // Atom
-use colored::*;
+use colored::Colorize;
 use parser::Command;
 fn main() {
     nannou::app(model)
@@ -52,7 +52,7 @@ fn model(app: &App) -> Model {
     // Create the UI.
     let mut ui = app.new_ui().build().unwrap();
     ui.fonts_mut()
-        .insert_from_file("timesnewarial.ttf")
+        .insert_from_file("F25_Bank_Printer.ttf")
         .unwrap();
     // Generate some ids for our widgets.
     let ids = Ids {
@@ -60,7 +60,7 @@ fn model(app: &App) -> Model {
     };
 
     // Init our variables
-    let text_edit = "bufu".to_owned();
+    let text_edit = "".to_string();
     let variables = HashMap::new();
     let instructions: Vec<Command> = Vec::new();
 
@@ -78,6 +78,7 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 
     if let Some(edit) = widget::TextEdit::new(&model.text_edit)
         .color(color::WHITE)
+        .font_size(16)
         .top_left_with_margin(10.0)
         .line_spacing(2.5)
         .restrict_to_height(false)
@@ -111,7 +112,6 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                     );
                 }
             }
-            // ?????????????????????????????
             // Here we assing to position the value of instruction move so we can
             // draw all our object in the right position
             //
@@ -173,6 +173,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                     }
                 }
             }
+
             Command::DrawShapeVf32((shape, var, val2)) => {
                 if let Some(val1) = model.variables.get(var) {
                     draw_shape(
@@ -186,6 +187,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                     );
                 }
             }
+
             Command::DrawShapef32V((shape, val1, var)) => {
                 if let Some(val2) = model.variables.get(var) {
                     draw_shape(
@@ -199,6 +201,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                     );
                 }
             }
+
             Command::For((times, v)) => {
                 let times = times.parse::<i32>().unwrap();
                 let mut tmp_hash_map = HashMap::new();
@@ -304,6 +307,7 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                                 Command::DeclareVariable((key, value)) => {
                                     model.variables.insert(key, value);
                                 }
+
                                 Command::DrawShape2Variables((_, var1, var2)) => {
                                     if model.variables.get(&var1).is_some() {
                                         if model.variables.get(&var2).is_some() {
@@ -320,6 +324,7 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                                         println!("{} {}", "error on variables:".red(), var1.red());
                                     }
                                 }
+
                                 Command::DrawShapeVf32((_, var, _)) => {
                                     if model.variables.get(&var).is_some() {
                                     } else {
@@ -327,6 +332,7 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                                         println!("{} {}", "error on variable:".red(), var.red());
                                     }
                                 }
+
                                 Command::DrawShapeWVariable((_, var)) => {
                                     if model.variables.get(&var).is_some() {
                                     } else {
@@ -334,6 +340,7 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                                         println!("{} {}", "error on variable:".red(), var.red());
                                     }
                                 }
+
                                 Command::DrawShapef32V((_, _, var)) => {
                                     if model.variables.get(&var).is_some() {
                                     } else {
@@ -353,7 +360,7 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                     } else {
                         println!("{}", "CAN'T UPDATE ABSTRACT SYNTAX TREE".red().bold());
                         println!("{:#?}", parser::parser(&model.text_edit));
-                        println!("error: {}", &remaining.red().bold());
+                        println!("{} {}", "error:".red().bold(), &remaining.red().bold());
                     }
                 }
             }
