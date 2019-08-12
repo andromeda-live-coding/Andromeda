@@ -60,7 +60,6 @@ fn model(app: &App) -> Model {
     };
 
     // Init our variables
-    let position = pt2(0.0, 0.0);
     let text_edit = "bufu".to_owned();
     let variables = HashMap::new();
     let instructions: Vec<Command> = Vec::new();
@@ -77,7 +76,7 @@ fn model(app: &App) -> Model {
 fn update(_app: &App, model: &mut Model, _update: Update) {
     let ui = &mut model.ui.set_widgets();
 
-    for edit in widget::TextEdit::new(&model.text_edit)
+    if let Some(edit) = widget::TextEdit::new(&model.text_edit)
         .color(color::WHITE)
         .top_left_with_margin(10.0)
         .line_spacing(2.5)
@@ -104,10 +103,10 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                     draw_shape(
                         &draw,
                         shape.as_ref(),
-                        &position.0,
-                        &position.1,
-                        val,
-                        val,
+                        position.0,
+                        position.1,
+                        *val,
+                        *val,
                         (color.red, color.green, color.blue),
                     );
                 }
@@ -117,8 +116,8 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             // draw all our object in the right position
             //
             Command::Move(bufu) => {
-                position.0 = position.0 + bufu.0;
-                position.1 = position.1 + bufu.1;
+                position.0 += bufu.0;
+                position.1 += bufu.1;
             }
 
             Command::ResetMove => {
@@ -129,10 +128,10 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                 draw_shape(
                     &draw,
                     shape.as_ref(),
-                    &position.0,
-                    &position.1,
-                    f32value,
-                    f32value,
+                    position.0,
+                    position.1,
+                    *f32value,
+                    *f32value,
                     (color.red, color.green, color.blue),
                 );
             }
@@ -141,10 +140,10 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                 draw_shape(
                     &draw,
                     shape.as_ref(),
-                    &position.0,
-                    &position.1,
-                    &std_value,
-                    &std_value,
+                    position.0,
+                    position.1,
+                    std_value,
+                    std_value,
                     (color.red, color.green, color.blue),
                 );
             }
@@ -152,10 +151,10 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                 draw_shape(
                     &draw,
                     shape.as_ref(),
-                    &position.0,
-                    &position.1,
-                    val1,
-                    val2,
+                    position.0,
+                    position.1,
+                    *val1,
+                    *val2,
                     (color.red, color.green, color.blue),
                 );
             }
@@ -165,10 +164,10 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                         draw_shape(
                             &draw,
                             shape.as_ref(),
-                            &position.0,
-                            &position.1,
-                            val1,
-                            val2,
+                            position.0,
+                            position.1,
+                            *val1,
+                            *val2,
                             (color.red, color.green, color.blue),
                         );
                     }
@@ -179,10 +178,10 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                     draw_shape(
                         &draw,
                         shape.as_ref(),
-                        &position.0,
-                        &position.1,
-                        val1,
-                        val2,
+                        position.0,
+                        position.1,
+                        *val1,
+                        *val2,
                         (color.red, color.green, color.blue),
                     );
                 }
@@ -192,10 +191,10 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                     draw_shape(
                         &draw,
                         shape.as_ref(),
-                        &position.0,
-                        &position.1,
-                        val1,
-                        val2,
+                        position.0,
+                        position.1,
+                        *val1,
+                        *val2,
                         (color.red, color.green, color.blue),
                     );
                 }
@@ -203,7 +202,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             Command::For((times, v)) => {
                 let times = times.parse::<i32>().unwrap();
                 let mut tmp_hash_map = HashMap::new();
-                for n in 0..times {
+                for _ in 0..times {
                     for cmd in v {
                         match cmd {
                             Command::DeclareVariable((key, value)) => {
@@ -214,18 +213,18 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                     draw_shape(
                                         &draw,
                                         shape.as_ref(),
-                                        &position.0,
-                                        &position.1,
-                                        val,
-                                        val,
+                                        position.0,
+                                        position.1,
+                                        *val,
+                                        *val,
                                         (color.red, color.green, color.blue),
                                     );
                                 }
                             }
 
                             Command::Move((x, y)) => {
-                                position.0 = position.0 + x;
-                                position.1 = position.1 + y;
+                                position.0 += x;
+                                position.1 += y;
                             }
                             Command::ResetMove => {
                                 position.0 = 0.0;
@@ -235,10 +234,10 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                 draw_shape(
                                     &draw,
                                     shape.as_ref(),
-                                    &position.0,
-                                    &position.1,
-                                    &f32value,
-                                    &f32value,
+                                    position.0,
+                                    position.1,
+                                    *f32value,
+                                    *f32value,
                                     (color.red, color.green, color.blue),
                                 );
                             }
@@ -266,23 +265,23 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     fn draw_shape(
         c: &Draw,
         shape: &str,
-        x: &f32,
-        y: &f32,
-        val1: &f32,
-        val2: &f32,
+        x: f32,
+        y: f32,
+        val1: f32,
+        val2: f32,
         color: (f32, f32, f32),
     ) {
         match shape {
             "box" => {
                 c.quad()
-                    .x_y(*x, *y)
-                    .w_h(*val1, *val2)
+                    .x_y(x, y)
+                    .w_h(val1, val2)
                     .color(rgb(color.0, color.1, color.2));
             }
             "circle" => {
                 c.ellipse()
-                    .x_y(*x, *y)
-                    .w_h(*val1, *val2)
+                    .x_y(x, y)
+                    .w_h(val1, val2)
                     .color(rgb(color.0, color.1, color.2));
             }
             _ => (),
@@ -306,36 +305,40 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                                     model.variables.insert(key, value);
                                 }
                                 Command::DrawShape2Variables((_, var1, var2)) => {
-                                    if let Some(_) = model.variables.get(&var1) {
-                                        if let Some(_) = model.variables.get(&var2) {
+                                    if model.variables.get(&var1).is_some() {
+                                        if model.variables.get(&var2).is_some() {
                                         } else {
                                             semantic_analysis = false;
-                                            println!("error on variables: {}", var2);
+                                            println!(
+                                                "{} {}",
+                                                "error on variables:".red(),
+                                                var2.red()
+                                            );
                                         }
                                     } else {
                                         semantic_analysis = false;
-                                        println!("error on variables: {}", var1);
+                                        println!("{} {}", "error on variables:".red(), var1.red());
                                     }
                                 }
-                                Command::DrawShapeVf32((_, var, val)) => {
-                                    if let Some(_) = model.variables.get(&var) {
+                                Command::DrawShapeVf32((_, var, _)) => {
+                                    if model.variables.get(&var).is_some() {
                                     } else {
                                         semantic_analysis = false;
-                                        println!("error on variable: {}", val);
+                                        println!("{} {}", "error on variable:".red(), var.red());
                                     }
                                 }
                                 Command::DrawShapeWVariable((_, var)) => {
-                                    if let Some(_) = model.variables.get(&var) {
+                                    if model.variables.get(&var).is_some() {
                                     } else {
                                         semantic_analysis = false;
-                                        println!("error on variable: {}", var);
+                                        println!("{} {}", "error on variable:".red(), var.red());
                                     }
                                 }
                                 Command::DrawShapef32V((_, _, var)) => {
-                                    if let Some(_) = model.variables.get(&var) {
+                                    if model.variables.get(&var).is_some() {
                                     } else {
                                         semantic_analysis = false;
-                                        println!("error on variables: {}", var);
+                                        println!("{} {}", "error on variables:".red(), var.red());
                                     }
                                 }
                                 _ => (),
@@ -348,9 +351,9 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                             model.instructions = ast;
                         }
                     } else {
-                        println!("not updating AST");
+                        println!("{}", "CAN'T UPDATE ABSTRACT SYNTAX TREE".red().bold());
                         println!("{:#?}", parser::parser(&model.text_edit));
-                        println!("error: {}", &remaining.red());
+                        println!("error: {}", &remaining.red().bold());
                     }
                 }
             }
