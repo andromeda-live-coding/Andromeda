@@ -9,6 +9,11 @@ use nom::number::complete::float;
 use nom::sequence::{delimited, preceded, terminated, tuple};
 use nom::IResult;
 
+use nom::{
+    character::complete::char, character::complete::space0 as space, multi::fold_many0,
+    sequence::pair,
+};
+
 // it recognizes a variable name like "x", "y", "xy", "myVariablE"
 fn variable_parser(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
     map(alpha1, |x: &str| x)(input)
@@ -174,6 +179,7 @@ pub enum Command {
 
     DrawShapeVf32((String, String, f32)),
     DrawShapef32V((String, f32, String)),
+
     // move f32 f32
     Move((f32, f32)),
     ResetMove,
@@ -185,16 +191,59 @@ pub enum Command {
 
 fn _check_syntax(content: &str) -> bool {
     match parser(content) {
-        Ok(not_parsed) => {
-            if not_parsed.0 == "" {
-                true
-            } else {
-                false
-            }
-        }
+        Ok(not_parsed) => not_parsed.0 == "",
         Err(_) => (false),
     }
 }
+
+// We parse any expr surrounded by parens, ignoring all whitespaces around those
+fn parens(i: &str) -> IResult<&str, f32> {
+    delimited(space, delimited(tag("("), expr, tag(")")), space)(i)
+}
+
+// We transform an integer string into a i64, ignoring surrounding whitespaces
+// We look for a digit suite, and try to convert it.
+// If either str::from_utf8 or FromStr::from_str fail,
+// we fallback to the parens parser defined above
+fn factor(i: &str) -> IResult<&str, f32> {
+    alt((map(delimited(space, float, space), |x| x), parens))(i)
+}
+
+// We read an initial factor and for each time we find
+// a * or / operator followed by another factor, we do
+// the math by folding everything
+fn term(i: &str) -> IResult<&str, f32> {
+    let (i, init) = factor(i)?;
+    fold_many0(
+        pair(alt((char('*'), char('/'))), factor),
+        init,
+        |acc, (op, val): (char, f32)| {
+            if op == '*' {
+                acc * val
+            } else {
+                acc / val
+            }
+        },
+    )(i)
+}
+//
+
+fn expr(i: &str) -> IResult<&str, f32> {
+    let (i, init) = term(i)?;
+
+    fold_many0(
+        pair(alt((char('+'), char('-'))), term),
+        init,
+        |acc, (op, val): (char, f32)| {
+            if op == '+' {
+                acc + val
+            } else {
+                acc - val
+            }
+        },
+    )(i)
+}
+
 #[cfg(test)]
 mod tests {
     use super::_check_syntax;

@@ -97,8 +97,6 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     for x in &model.instructions {
         match x {
             Command::DeclareVariable((_, _)) => {}
-            // actually implementing box space0 alpha1 pattern (to recognize "box x", or "box y")
-            // it should also cover other patterns
             Command::DrawShapeWVariable((shape, y)) => {
                 if let Some(val) = model.variables.get(y) {
                     draw_shape(
@@ -257,14 +255,12 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             }
         }
     }
-    //
     // Write the result of our drawing to the window's frame.
     draw.to_frame(app, &frame).unwrap();
 
     // Draw the state of the `Ui` to the frame.
     model.ui.draw_to_frame(app, &frame).unwrap();
 
-    // inner function used to draw
     fn draw_shape(
         c: &Draw,
         shape: &str,
@@ -301,7 +297,6 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                     println!("{:#?}", parser::parser(&model.text_edit));
                     if remaining == "" {
                         let mut semantic_analysis = true;
-                        //model.instructions = ast;
                         for x in ast.to_owned() {
                             match x {
                                 Command::DeclareVariable((key, value)) => {
@@ -351,8 +346,6 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                                 _ => (),
                             }
                         }
-                        /////// IL PROBLEMA E' CHE QUANDO VALIDO LA STRUTTURA, LA PRIMA VOLTA NON COPIO GLI ELEMENTI DENTRO AL MODEL QUINDI NON DISEGNA
-
                         // updating AST only if parser success and there isn't nothing left to parse
                         if semantic_analysis {
                             model.instructions = ast;
