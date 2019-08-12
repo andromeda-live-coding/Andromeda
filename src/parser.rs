@@ -1,5 +1,3 @@
-// IT'S LIKE IT VISIT ast 2 TIMES ???????????????????????????????????????????????
-
 // nom
 use nom::branch::alt;
 use nom::bytes::complete::tag;
@@ -146,12 +144,12 @@ pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
             preceded(multispace0, declare_box_with_f32_var),
             preceded(multispace0, declare_box_with_var_f32),
             preceded(multispace0, declare_variable_parser),
-            preceded(multispace0, declare_box_with_2variables),
             preceded(multispace0, declare_box_f32_f32),
             preceded(multispace0, declare_box_f32_parser),
             preceded(multispace0, declare_box_with_variable_parser),
             preceded(multispace0, declare_box),
             preceded(multispace0, move_parser),
+            preceded(multispace0, declare_box_with_2variables),
             preceded(multispace0, reset_move_parser),
             preceded(multispace0, color_parser),
         )),
@@ -197,7 +195,6 @@ fn _check_syntax(content: &str) -> bool {
         Err(_) => (false),
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::_check_syntax;
