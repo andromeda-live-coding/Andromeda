@@ -1,13 +1,10 @@
 mod parser;
-// nannou
+use colored::Colorize;
 use nannou::app::Draw;
 use nannou::prelude::*;
 use nannou::ui::prelude::*;
-// std
-use std::collections::HashMap;
-// Atom
-use colored::Colorize;
 use parser::Command;
+use std::collections::HashMap;
 fn main() {
     let p = crate::parser::expr("+7-2*(9*8)");
     println!("{:#?}", p);
@@ -22,7 +19,7 @@ struct Model {
     ui: Ui,
     ids: Ids,
     text_edit: String,
-    variables: HashMap<String, f32>,
+    //variables: HashMap<String, f32>,
     instructions: Vec<Command>,
 }
 
@@ -63,14 +60,14 @@ fn model(app: &App) -> Model {
 
     // Init our variables
     let text_edit = "".to_string();
-    let variables = HashMap::new();
+    //let variables = HashMap::new();
     let instructions: Vec<Command> = Vec::new();
 
     Model {
         ui,
         ids,
         text_edit,
-        variables,
+        //variables,
         instructions,
     }
 }
@@ -99,19 +96,6 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     for x in &model.instructions {
         match x {
             Command::DeclareVariable((_, _)) => {}
-            Command::DrawShapeWVariable((shape, y)) => {
-                if let Some(val) = model.variables.get(y) {
-                    draw_shape(
-                        &draw,
-                        shape.as_ref(),
-                        position.0,
-                        position.1,
-                        *val,
-                        *val,
-                        (color.red, color.green, color.blue),
-                    );
-                }
-            }
             Command::DrawShape(shape) => {
                 draw_shape(
                     &draw,
@@ -123,7 +107,9 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                     (color.red, color.green, color.blue),
                 );
             }
-            Command::DrawShapeWf32f32((shape, val1, val2)) => {
+
+            // f32 values must arrive, so we have to convert strings on the parser side
+            Command::DrawShapeWf32((shape, val1, val2)) => {
                 draw_shape(
                     &draw,
                     shape.as_ref(),
@@ -133,49 +119,6 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                     *val2,
                     (color.red, color.green, color.blue),
                 );
-            }
-            Command::DrawShape2Variables((shape, var1, var2)) => {
-                if let Some(val1) = model.variables.get(var1) {
-                    if let Some(val2) = model.variables.get(var2) {
-                        draw_shape(
-                            &draw,
-                            shape.as_ref(),
-                            position.0,
-                            position.1,
-                            *val1,
-                            *val2,
-                            (color.red, color.green, color.blue),
-                        );
-                    }
-                }
-            }
-
-            Command::DrawShapeVf32((shape, var, val2)) => {
-                if let Some(val1) = model.variables.get(var) {
-                    draw_shape(
-                        &draw,
-                        shape.as_ref(),
-                        position.0,
-                        position.1,
-                        *val1,
-                        *val2,
-                        (color.red, color.green, color.blue),
-                    );
-                }
-            }
-
-            Command::DrawShapef32V((shape, val1, var)) => {
-                if let Some(val2) = model.variables.get(var) {
-                    draw_shape(
-                        &draw,
-                        shape.as_ref(),
-                        position.0,
-                        position.1,
-                        *val1,
-                        *val2,
-                        (color.red, color.green, color.blue),
-                    );
-                }
             }
         }
     }
@@ -215,8 +158,9 @@ fn view(app: &App, model: &Model, frame: &Frame) {
 fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
     match event {
         KeyPressed(key) => {
+            // when user press Lcontrol
             if key == nannou::prelude::Key::LControl {
-                model.variables = HashMap::new();
+                //model.variables = HashMap::new();
                 if let Ok((remaining, ast)) = parser::parser(&model.text_edit) {
                     println!("{:#?}", parser::parser(&model.text_edit));
                     if remaining == "" {
@@ -224,49 +168,10 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                         for x in ast.to_owned() {
                             match x {
                                 Command::DeclareVariable((key, value)) => {
-                                    model.variables.insert(key, value);
+                                    //model.variables.insert(key, value);
                                 }
 
-                                Command::DrawShape2Variables((_, var1, var2)) => {
-                                    if model.variables.get(&var1).is_some() {
-                                        if model.variables.get(&var2).is_some() {
-                                        } else {
-                                            semantic_analysis = false;
-                                            println!(
-                                                "{} {}",
-                                                "error on variables:".red(),
-                                                var2.red()
-                                            );
-                                        }
-                                    } else {
-                                        semantic_analysis = false;
-                                        println!("{} {}", "error on variables:".red(), var1.red());
-                                    }
-                                }
-
-                                Command::DrawShapeVf32((_, var, _)) => {
-                                    if model.variables.get(&var).is_some() {
-                                    } else {
-                                        semantic_analysis = false;
-                                        println!("{} {}", "error on variable:".red(), var.red());
-                                    }
-                                }
-
-                                Command::DrawShapeWVariable((_, var)) => {
-                                    if model.variables.get(&var).is_some() {
-                                    } else {
-                                        semantic_analysis = false;
-                                        println!("{} {}", "error on variable:".red(), var.red());
-                                    }
-                                }
-
-                                Command::DrawShapef32V((_, _, var)) => {
-                                    if model.variables.get(&var).is_some() {
-                                    } else {
-                                        semantic_analysis = false;
-                                        println!("{} {}", "error on variables:".red(), var.red());
-                                    }
-                                }
+                                Command::DrawShapeWf32((shape, val1, val2)) => {}
                                 _ => (),
                             }
                         }

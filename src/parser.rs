@@ -1,3 +1,7 @@
+// *****parser*****
+// i need to convert variables in f32 here!
+// MVC has just to do DrawShapeWf32(shape, val1, val2) where val1 and val2 are f32!
+// we need an Hashmap inside the parser because we need to keep track of all variables in the context.
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, multispace0, space0};
@@ -33,48 +37,14 @@ fn declare_box_with_f32_var_or_var_f32_or_var_var_or_f32_f32(
 ) -> IResult<&str, Command, VerboseError<&str>> {
     alt((
         map(
-            tuple((
-                alt((tag("box"), tag("circle"))),
-                space0,
-                variable_parser,
-                space0,
-                float,
-            )),
-            |(shape, _, var1, _, val2): (&str, _, &str, _, f32)| {
-                Command::DrawShapeVf32((shape.to_string(), var1.to_string(), val2))
-            },
-        ),
-        map(
-            tuple((tag("box"), space0, float, space0, variable_parser)),
-            |(shape, _, val1, _, var2): (&str, _, f32, _, &str)| {
-                Command::DrawShapef32V((shape.to_string(), val1, var2.to_string()))
-            },
-        ),
-        map(
-            tuple((tag("box"), space0, variable_parser, space0, variable_parser)),
-            |(shape, _, var1, _, var2): (&str, _, &str, _, &str)| {
-                Command::DrawShape2Variables((
-                    shape.to_string(),
-                    var1.to_string(),
-                    var2.to_string(),
-                ))
-            },
-        ),
-        map(
             tuple((tag("box"), space0, float, space0, float)),
             |(shape, _, val1, _, val2): (&str, _, _, _, _)| {
-                Command::DrawShapeWf32f32((shape.to_string(), val1, val2))
+                Command::DrawShapeWf32((shape.to_string(), val1, val2))
             },
-        ),
-        map(
-            tuple((alt((tag("box"), tag("circle"))), space0, variable_parser)),
-            |(x, _, value)| Command::DrawShapeWVariable((x.to_string(), value.to_string())),
         ),
         map(
             tuple((tag("box"), space0, expr)),
-            |(x, _, value): (&str, _, f32)| {
-                Command::DrawShapeWf32f32((x.to_string(), value, value))
-            },
+            |(x, _, value): (&str, _, f32)| Command::DrawShapeWf32((x.to_string(), value, value)),
         ),
     ))(input)
 }
@@ -139,13 +109,6 @@ pub enum Command {
     DeclareVariable((String, f32)),
     // box | circle
     DrawShape(String),
-    // box x | circle y
-    DrawShapeWVariable((String, String)),
-    // box f32 f32
-    DrawShapeWf32f32((String, f32, f32)),
-    // box x y
-    DrawShape2Variables((String, String, String)),
-
-    DrawShapeVf32((String, String, f32)),
-    DrawShapef32V((String, f32, String)),
+    // box var var
+    DrawShapeWf32((String, f32, f32)),
 }
