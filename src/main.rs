@@ -9,6 +9,8 @@ use std::collections::HashMap;
 use colored::Colorize;
 use parser::Command;
 fn main() {
+    let p = crate::parser::expr("+7-2*(9*8)");
+    println!("{:#?}", p);
     nannou::app(model)
         .event(event)
         .update(update)
@@ -96,6 +98,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     let mut color = rgb(1.0, 1.0, 1.0);
     for x in &model.instructions {
         match x {
+            Command::Expr(_) => (),
             Command::DeclareVariable((_, _)) => {}
             Command::DrawShapeWVariable((shape, y)) => {
                 if let Some(val) = model.variables.get(y) {
@@ -206,6 +209,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                 for _ in 0..times {
                     for cmd in v {
                         match cmd {
+                            Command::Expr(_) => (),
                             Command::DeclareVariable((key, value)) => {
                                 tmp_hash_map.insert(key.to_string(), value);
                             }
