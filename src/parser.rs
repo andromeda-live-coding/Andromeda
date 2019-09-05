@@ -37,7 +37,7 @@ fn declare_box_with_f32_var_or_var_f32_or_var_var_or_f32_f32(
 ) -> IResult<&str, Command, VerboseError<&str>> {
     alt((
         map(
-            tuple((tag("box"), space0, float, space0, float)),
+            tuple((tag("box"), space0, expr, space0, expr)),
             |(shape, _, val1, _, val2): (&str, _, _, _, _)| {
                 Command::DrawShapeWf32((shape.to_string(), val1, val2))
             },
