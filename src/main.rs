@@ -92,13 +92,12 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 
 fn view(app: &App, model: &Model, frame: &Frame) {
     let draw = app.draw();
-    let mut position: (f32, f32) = (0.0, 0.0);
+    let position: (f32, f32) = (0.0, 0.0);
     let std_value = 10.0;
     draw.background().rgb(0.39, 0.39, 0.39);
-    let mut color = rgb(1.0, 1.0, 1.0);
+    let color = rgb(1.0, 1.0, 1.0);
     for x in &model.instructions {
         match x {
-            Command::Expr(_) => (),
             Command::DeclareVariable((_, _)) => {}
             Command::DrawShapeWVariable((shape, y)) => {
                 if let Some(val) = model.variables.get(y) {
@@ -113,30 +112,6 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                     );
                 }
             }
-            // Here we assing to position the value of instruction move so we can
-            // draw all our object in the right position
-            //
-            Command::Move(bufu) => {
-                position.0 += bufu.0;
-                position.1 += bufu.1;
-            }
-
-            Command::ResetMove => {
-                position.0 = 0.0;
-                position.1 = 0.0;
-            }
-            Command::DrawShapeWf32((shape, f32value)) => {
-                draw_shape(
-                    &draw,
-                    shape.as_ref(),
-                    position.0,
-                    position.1,
-                    *f32value,
-                    *f32value,
-                    (color.red, color.green, color.blue),
-                );
-            }
-            Command::Color((r, g, b)) => (color = rgb(*r, *g, *b)),
             Command::DrawShape(shape) => {
                 draw_shape(
                     &draw,
@@ -200,61 +175,6 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                         *val2,
                         (color.red, color.green, color.blue),
                     );
-                }
-            }
-
-            Command::For((times, v)) => {
-                let times = times.parse::<i32>().unwrap();
-                let mut tmp_hash_map = HashMap::new();
-                for _ in 0..times {
-                    for cmd in v {
-                        match cmd {
-                            Command::Expr(_) => (),
-                            Command::DeclareVariable((key, value)) => {
-                                tmp_hash_map.insert(key.to_string(), value);
-                            }
-                            Command::DrawShapeWVariable((shape, y)) => {
-                                if let Some(val) = model.variables.get(y) {
-                                    draw_shape(
-                                        &draw,
-                                        shape.as_ref(),
-                                        position.0,
-                                        position.1,
-                                        *val,
-                                        *val,
-                                        (color.red, color.green, color.blue),
-                                    );
-                                }
-                            }
-
-                            Command::Move((x, y)) => {
-                                position.0 += x;
-                                position.1 += y;
-                            }
-                            Command::ResetMove => {
-                                position.0 = 0.0;
-                                position.1 = 0.0;
-                            }
-                            Command::DrawShapeWf32((shape, f32value)) => {
-                                draw_shape(
-                                    &draw,
-                                    shape.as_ref(),
-                                    position.0,
-                                    position.1,
-                                    *f32value,
-                                    *f32value,
-                                    (color.red, color.green, color.blue),
-                                );
-                            }
-                            Command::Color(_) => (),
-                            Command::DrawShape(_) => (),
-                            Command::DrawShapeWf32f32(_) => (),
-                            Command::DrawShape2Variables(_) => (),
-                            Command::For(_) => (),
-                            Command::DrawShapeVf32(_) => (),
-                            Command::DrawShapef32V(_) => (),
-                        }
-                    }
                 }
             }
         }

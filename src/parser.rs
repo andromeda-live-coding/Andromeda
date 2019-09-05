@@ -1,6 +1,6 @@
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{alpha1, char, digit1, multispace0, space0};
+use nom::character::complete::{alpha1, char, multispace0, space0};
 use nom::combinator::map;
 use nom::error::VerboseError;
 use nom::multi::{fold_many0, many0};
@@ -21,17 +21,12 @@ fn declare_variable_parser(input: &str) -> IResult<&str, Command, VerboseError<&
     )(input)
 }
 
+// it recognizes pattern **box**
 fn declare_box(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     map(tag("box"), |shape: &str| {
         Command::DrawShape(shape.to_string())
     })(input)
 }
-
-/*fn declare_circle(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
-    map(tag("circle"), |shape: &str| {
-        Command::DrawShape(shape.to_string())
-    })(input)
-}*/
 
 //it recognizes pattern **box alpha** (where alpha is a variable)
 fn declare_box_with_variable_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
@@ -42,7 +37,6 @@ fn declare_box_with_variable_parser(input: &str) -> IResult<&str, Command, Verbo
 }
 
 // it recognizes pattern **box expr**
-// it not recognizes pattern **box variable**
 fn declare_box_f32_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     map(
         tuple((tag("box"), space0, expr)),
@@ -50,16 +44,7 @@ fn declare_box_f32_parser(input: &str) -> IResult<&str, Command, VerboseError<&s
     )(input)
 }
 
-fn declare_box_f32_f32(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
-    map(
-        tuple((tag("box"), space0, float, space0, float)),
-        |(shape, _, val1, _, val2): (&str, _, _, _, _)| {
-            Command::DrawShapeWf32f32((shape.to_string(), val1, val2))
-        },
-    )(input)
-}
-
-fn declare_box_with_f32_var_or_var_f32_or_var_var(
+fn declare_box_with_f32_var_or_var_f32_or_var_var_or_f32_f32(
     input: &str,
 ) -> IResult<&str, Command, VerboseError<&str>> {
     alt((
@@ -76,13 +61,7 @@ fn declare_box_with_f32_var_or_var_f32_or_var_var(
             },
         ),
         map(
-            tuple((
-                tag("box"),
-                space0,
-                float,
-                space0,
-                variable_parser,
-            )),
+            tuple((tag("box"), space0, float, space0, variable_parser)),
             |(shape, _, val1, _, var2): (&str, _, f32, _, &str)| {
                 Command::DrawShapef32V((shape.to_string(), val1, var2.to_string()))
             },
@@ -97,40 +76,13 @@ fn declare_box_with_f32_var_or_var_f32_or_var_var(
                 ))
             },
         ),
+        map(
+            tuple((tag("box"), space0, float, space0, float)),
+            |(shape, _, val1, _, val2): (&str, _, _, _, _)| {
+                Command::DrawShapeWf32f32((shape.to_string(), val1, val2))
+            },
+        ),
     ))(input)
-}
-
-// it recognizes pattern **move float float**
-fn move_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
-    map(
-        tuple((tag("move"), space0, float, space0, float)),
-        |(_, _, val1, _, val2)| Command::Move((val1, val2)),
-    )(input)
-}
-
-fn reset_move_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
-    map(tag("reset_m"), |_| Command::ResetMove)(input)
-}
-
-// it recognizes pattern **color f32 f32 f32**
-fn color_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
-    map(
-        tuple((tag("color"), space0, float, space0, float, space0, float)),
-        |(_, _, r, _, g, _, b)| Command::Color((r, g, b)),
-    )(input)
-}
-
-fn for_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
-    map(
-        tuple((
-            tag("for"),
-            space0,
-            digit1,
-            space0,
-            delimited(tag("("), parser, tag(")")),
-        )),
-        |(_, _, times, _, v): (_, _, &str, _, Vec<Command>)| Command::For((times.to_string(), v)),
-    )(input)
 }
 
 // We parse any expr surrounded by parens, ignoring all whitespaces around those
@@ -176,17 +128,14 @@ pub fn expr(i: &str) -> IResult<&str, f32, VerboseError<&str>> {
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
     many0(terminated(
         alt((
-            preceded(multispace0, declare_box_with_f32_var_or_var_f32_or_var_var),
-            preceded(multispace0, declare_box_f32_parser),
-            preceded(multispace0, for_parser),
-            preceded(multispace0, declare_variable_parser),
-            preceded(multispace0, declare_box_f32_f32),
+            preceded(
+                multispace0,
+                declare_box_with_f32_var_or_var_f32_or_var_var_or_f32_f32,
+            ),
             preceded(multispace0, declare_box_with_variable_parser),
+            preceded(multispace0, declare_box_f32_parser),
+            preceded(multispace0, declare_variable_parser),
             preceded(multispace0, declare_box),
-            preceded(multispace0, move_parser),
-            //preceded(multispace0, declare_box_with_2variables),
-            preceded(multispace0, reset_move_parser),
-            preceded(multispace0, color_parser),
         )),
         multispace0,
     ))(input)
@@ -207,49 +156,4 @@ pub enum Command {
 
     DrawShapeVf32((String, String, f32)),
     DrawShapef32V((String, f32, String)),
-
-    // move f32 f32
-    Move((f32, f32)),
-    ResetMove,
-    // color f32 f32 f32
-    Color((f32, f32, f32)),
-
-    For((String, Vec<Command>)),
 }
-
-// fn _check_syntax(content: &str) -> bool {
-//     match parser(content) {
-//         Ok(not_parsed) => not_parsed.0 == "",
-//         Err(_) => (false),
-//     }
-// }
-// #[cfg(test)]
-// mod tests {
-//     use super::_check_syntax;
-//     #[test]
-//     fn test_valid() {
-//         let content = "x: 12.3\nbox x";
-//         assert_eq!(_check_syntax(content), true);
-//     }
-
-//     #[test]
-//     fn test_invalid_1() {
-//         let content = "asldkjasldkjal";
-//         assert_eq!(_check_syntax(content), false);
-//     }
-
-//     #[test]
-//     fn test_invalid_2() {
-//         let content = "x: 123.4\nbox x\n uncorrect syntax";
-//         assert_eq!(_check_syntax(content), false);
-//     }
-// }
-
-// // it recognizes a variable
-// fn variab_parser(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
-//     map(alpha1, |x: &str| x)(input)
-// }
-
-// fn builtin(input: &str) -> IResult<&str, String, VerboseError<&str>> {
-//     map(one_of("+-*/"), |x| x.to_string())(input)
-// }
