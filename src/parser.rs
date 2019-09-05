@@ -28,22 +28,6 @@ fn declare_box(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     })(input)
 }
 
-//it recognizes pattern **box alpha** (where alpha is a variable)
-fn declare_box_with_variable_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
-    map(
-        tuple((alt((tag("box"), tag("circle"))), space0, variable_parser)),
-        |(x, _, value)| Command::DrawShapeWVariable((x.to_string(), value.to_string())),
-    )(input)
-}
-
-// it recognizes pattern **box expr**
-fn declare_box_f32_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
-    map(
-        tuple((tag("box"), space0, expr)),
-        |(x, _, value): (&str, _, f32)| Command::DrawShapeWf32f32((x.to_string(), value, value)),
-    )(input)
-}
-
 fn declare_box_with_f32_var_or_var_f32_or_var_var_or_f32_f32(
     input: &str,
 ) -> IResult<&str, Command, VerboseError<&str>> {
@@ -80,6 +64,16 @@ fn declare_box_with_f32_var_or_var_f32_or_var_var_or_f32_f32(
             tuple((tag("box"), space0, float, space0, float)),
             |(shape, _, val1, _, val2): (&str, _, _, _, _)| {
                 Command::DrawShapeWf32f32((shape.to_string(), val1, val2))
+            },
+        ),
+        map(
+            tuple((alt((tag("box"), tag("circle"))), space0, variable_parser)),
+            |(x, _, value)| Command::DrawShapeWVariable((x.to_string(), value.to_string())),
+        ),
+        map(
+            tuple((tag("box"), space0, expr)),
+            |(x, _, value): (&str, _, f32)| {
+                Command::DrawShapeWf32f32((x.to_string(), value, value))
             },
         ),
     ))(input)
@@ -132,8 +126,6 @@ pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
                 multispace0,
                 declare_box_with_f32_var_or_var_f32_or_var_var_or_f32_f32,
             ),
-            preceded(multispace0, declare_box_with_variable_parser),
-            preceded(multispace0, declare_box_f32_parser),
             preceded(multispace0, declare_variable_parser),
             preceded(multispace0, declare_box),
         )),
