@@ -11,6 +11,7 @@ use nom::multi::{fold_many0, many0};
 use nom::number::complete::float;
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 use nom::IResult;
+use std::collections::HashMap;
 
 // it recognizes a variable name like "x", "y", "xy", "myVariablE"
 fn variable_parser(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
@@ -31,8 +32,10 @@ fn declare_box(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
         Command::DrawShape(shape.to_string())
     })(input)
 }
-
-fn declare_box_with_f32_var_or_var_f32_or_var_var_or_f32_f32(
+// *****box variable*****
+// So here if we find ******box variable***** we have to find the value of the variable on the HashMap and set the command
+// Command::DrawShapeWf32((shape.to_string(), val1, val2))
+fn declare_box_with_var_or_f32_var_or_var_f32_or_var_var_or_f32_f32(
     input: &str,
 ) -> IResult<&str, Command, VerboseError<&str>> {
     alt((
