@@ -1,11 +1,12 @@
 // *****parser*****
-// i need to convert variables in f32 here!
-// MVC has just to do DrawShapeWf32(shape, val1, val2) where val1 and val2 are f32!
-// we need an Hashmap inside the parser because we need to keep track of all variables in the context.
+// it recognizes *instructions* like "box x y"
+// i need to convert variables in f32, if the variables were previously declared
+// **IMPORTANT** MVC has just to do DrawShapeWf32(shape, val1, val2) where val1 and val2 are f32!
+// i need an HashMap inside the parser because we need to keep track of all variables in the context.
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, multispace0, space0};
-use nom::combinator::map;
+use nom::combinator::{map, map_opt, map_res};
 use nom::error::VerboseError;
 use nom::multi::{fold_many0, many0};
 use nom::number::complete::float;
@@ -35,9 +36,7 @@ fn declare_box(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
 // *****box variable*****
 // So here if we find ******box variable***** we have to find the value of the variable on the HashMap and set the command
 // Command::DrawShapeWf32((shape.to_string(), val1, val2))
-fn declare_box_with_var_or_f32_var_or_var_f32_or_var_var_or_f32_f32(
-    input: &str,
-) -> IResult<&str, Command, VerboseError<&str>> {
+fn declare_cmp_box(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     alt((
         map(
             tuple((tag("box"), space0, expr, space0, expr)),
@@ -93,13 +92,20 @@ pub fn expr(i: &str) -> IResult<&str, f32, VerboseError<&str>> {
 }
 
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
+    let mut variables: HashMap<String, f32> = HashMap::new();
     many0(terminated(
         alt((
+            preceded(multispace0, declare_cmp_box),
             preceded(
                 multispace0,
-                declare_box_with_f32_var_or_var_f32_or_var_var_or_f32_f32,
+                map(declare_variable_parser, |x| {
+                    match x.clone() {
+                        Command::DeclareVariable((k, v)) => {
+                        }
+                        _ => (),
+                    } x
+                }),
             ),
-            preceded(multispace0, declare_variable_parser),
             preceded(multispace0, declare_box),
         )),
         multispace0,
