@@ -91,19 +91,20 @@ pub fn expr(i: &str) -> IResult<&str, f32, VerboseError<&str>> {
     )(i)
 }
 
-pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
-    let mut variables: HashMap<String, f32> = HashMap::new();
+pub fn parser<'a>(input: &'a str, variables: &mut HashMap<&str, f32>) -> IResult<&'a str, Vec<Command>, VerboseError<&'a str>> {
     many0(terminated(
         alt((
             preceded(multispace0, declare_cmp_box),
             preceded(
                 multispace0,
                 map(declare_variable_parser, |x| {
-                    match x.clone() {
+                    match x {
                         Command::DeclareVariable((k, v)) => {
+                            variables.insert(&k, v).unwrap();
                         }
                         _ => (),
-                    } x
+                    }
+                    x
                 }),
             ),
             preceded(multispace0, declare_box),

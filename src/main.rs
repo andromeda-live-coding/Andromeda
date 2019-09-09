@@ -19,7 +19,7 @@ struct Model {
     ui: Ui,
     ids: Ids,
     text_edit: String,
-    //variables: HashMap<String, f32>,
+    variables: HashMap<&str, f32>,
     instructions: Vec<Command>,
 }
 
@@ -60,14 +60,14 @@ fn model(app: &App) -> Model {
 
     // Init our variables
     let text_edit = "".to_string();
-    //let variables = HashMap::new();
+    let variables = HashMap::new();
     let instructions: Vec<Command> = Vec::new();
 
     Model {
         ui,
         ids,
         text_edit,
-        //variables,
+        variables,
         instructions,
     }
 }
@@ -160,9 +160,9 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
         KeyPressed(key) => {
             // when user press Lcontrol
             if key == nannou::prelude::Key::LControl {
-                //model.variables = HashMap::new();
-                if let Ok((remaining, ast)) = parser::parser(&model.text_edit) {
-                    println!("{:#?}", parser::parser(&model.text_edit));
+                model.variables = HashMap::new();
+                if let Ok((remaining, ast)) = parser::parser(&model.text_edit, &mut model.variables) {
+                    println!("{:#?}", parser::parser(&model.text_edit, &mut model.variables));
                     if remaining == "" {
                         let mut semantic_analysis = true;
                         for x in ast.to_owned() {
@@ -181,7 +181,7 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                         }
                     } else {
                         println!("{}", "CAN'T UPDATE ABSTRACT SYNTAX TREE".red().bold());
-                        println!("{:#?}", parser::parser(&model.text_edit));
+                        println!("{:#?}", parser::parser(&model.text_edit, &mut model.variables));
                         println!("{} {}", "error:".red().bold(), &remaining.red().bold());
                     }
                 }
