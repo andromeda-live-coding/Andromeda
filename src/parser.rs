@@ -6,7 +6,7 @@
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, multispace0, space0};
-use nom::combinator::{map, map_opt, map_res};
+use nom::combinator::map;
 use nom::error::VerboseError;
 use nom::multi::{fold_many0, many0};
 use nom::number::complete::float;
@@ -14,16 +14,37 @@ use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 use nom::IResult;
 use std::collections::HashMap;
 
+#[derive(Debug, PartialEq, Clone)]
+pub enum Command {
+    VariableName(String),
+    // x: f32
+    DeclareVariable((String, f32)),
+    // box | circle
+    DrawShape(String),
+    // box var var
+    DrawShapeWf32((String, f32, f32)),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Token {
+    Number(f32),
+    Variable(String),
+}
+
+fn number(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
+    map(float, |x| Token::Number(x))(input)
+}
+
 // it recognizes a variable name like "x", "y", "xy", "myVariablE"
-fn variable_parser(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
-    map(alpha1, |x: &str| x)(input)
+fn variable(input: &str) -> IResult<&str, String, VerboseError<&str>> {
+    map(alpha1, |x: &str| x.to_string())(input)
 }
 
 // it recognizes pattern **x: expr**
-fn declare_variable_parser(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
+fn variable_declaration(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
     map(
-        tuple((variable_parser, tag(":"), space0, expr)),
-        |(name, _, _, value)| Command::DeclareVariable((name.to_string(), value)),
+        tuple((variable, space0, tag(":"), space0, expr)),
+        |(name, _, _, _, value)| Command::DeclareVariable((name, value)),
     )(input)
 }
 
@@ -33,6 +54,7 @@ fn declare_box(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
         Command::DrawShape(shape.to_string())
     })(input)
 }
+
 // *****box variable*****
 // So here if we find ******box variable***** we have to find the value of the variable on the HashMap and set the command
 // Command::DrawShapeWf32((shape.to_string(), val1, val2))
@@ -77,7 +99,6 @@ fn term(i: &str) -> IResult<&str, f32, VerboseError<&str>> {
 
 pub fn expr(i: &str) -> IResult<&str, f32, VerboseError<&str>> {
     let (i, init) = term(i)?;
-
     fold_many0(
         pair(alt((char('+'), char('-'))), term),
         init,
@@ -91,34 +112,30 @@ pub fn expr(i: &str) -> IResult<&str, f32, VerboseError<&str>> {
     )(i)
 }
 
-pub fn parser<'a>(input: &'a str, variables: &mut HashMap<&str, f32>) -> IResult<&'a str, Vec<Command>, VerboseError<&'a str>> {
+pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
     many0(terminated(
         alt((
             preceded(multispace0, declare_cmp_box),
-            preceded(
-                multispace0,
-                map(declare_variable_parser, |x| {
-                    match x {
-                        Command::DeclareVariable((k, v)) => {
-                            variables.insert(&k, v).unwrap();
-                        }
-                        _ => (),
-                    }
-                    x
-                }),
-            ),
+            preceded(multispace0, variable_declaration),
             preceded(multispace0, declare_box),
         )),
         multispace0,
     ))(input)
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Command {
-    // x: f32
-    DeclareVariable((String, f32)),
-    // box | circle
-    DrawShape(String),
-    // box var var
-    DrawShapeWf32((String, f32, f32)),
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_something() {
+        let mut variables: HashMap<String, f32> = HashMap::new();
+        let (_, commands) = parser("x: 2").unwrap();
+        for command in commands {
+            if let Command::DeclareVariable((name, value)) = command {
+                variables.insert(name, value);
+            }
+        }
+        assert_eq!(false, true);
+    }
 }

@@ -19,7 +19,7 @@ struct Model {
     ui: Ui,
     ids: Ids,
     text_edit: String,
-    variables: HashMap<&str, f32>,
+    variables: HashMap<String, f32>,
     instructions: Vec<Command>,
 }
 
@@ -161,28 +161,13 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
             // when user press Lcontrol
             if key == nannou::prelude::Key::LControl {
                 model.variables = HashMap::new();
-                if let Ok((remaining, ast)) = parser::parser(&model.text_edit, &mut model.variables) {
-                    println!("{:#?}", parser::parser(&model.text_edit, &mut model.variables));
-                    if remaining == "" {
-                        let mut semantic_analysis = true;
-                        for x in ast.to_owned() {
-                            match x {
-                                Command::DeclareVariable((key, value)) => {
-                                    //model.variables.insert(key, value);
-                                }
-
-                                Command::DrawShapeWf32((shape, val1, val2)) => {}
-                                _ => (),
-                            }
+                if let Ok((_, ast)) = parser::parser(&model.text_edit) {
+                    for x in ast.to_owned() {
+                        match x {
+                            Command::DeclareVariable((key, value)) => {}
+                            Command::DrawShapeWf32((shape, val1, val2)) => {}
+                            _ => (),
                         }
-                        // updating AST only if parser success and there isn't nothing left to parse
-                        if semantic_analysis {
-                            model.instructions = ast;
-                        }
-                    } else {
-                        println!("{}", "CAN'T UPDATE ABSTRACT SYNTAX TREE".red().bold());
-                        println!("{:#?}", parser::parser(&model.text_edit, &mut model.variables));
-                        println!("{} {}", "error:".red().bold(), &remaining.red().bold());
                     }
                 }
             }
