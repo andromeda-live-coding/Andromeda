@@ -8,7 +8,7 @@ use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, multispace0, space0};
 use nom::combinator::map;
 use nom::error::VerboseError as Error;
-use nom::multi::{fold_many0, many0};
+use nom::multi::many0;
 use nom::number::complete::float;
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 use nom::IResult;
@@ -17,19 +17,18 @@ use std::collections::HashMap;
 #[derive(Debug, PartialEq, Clone)]
 pub enum Command {
     VariableName(String),
-    // x: f32
-    DeclareVariable((String, f32)),
+    // x: expr
+    DeclareVariable((String, Vec<Operation>)),
     // box | circle
     DrawShape(String),
     // box var var
-    DrawShapeWf32((String, f32, f32)),
+    DrawShapeWf32((String, Vec<Operation>, Vec<Operation>)),
 }
 
 #[derive(Debug, PartialEq)]
 enum Token {
     Assignment((String, Vec<Operation>)),
     VariableName(String),
-    Number(f32),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -39,7 +38,7 @@ enum Value {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-enum Operation {
+pub enum Operation {
     Identity(Value),
     Plus((Value, Value)),
     Minus((Value, Value)),
@@ -56,10 +55,6 @@ impl Block {
     pub fn new(tokens: Vec<Token>) -> Self {
         Self { tokens }
     }
-}
-
-fn number(input: &str) -> IResult<&str, Token, Error<&str>> {
-    map(float, |x| Token::Number(x))(input)
 }
 
 // it recognizes a variable name like "x", "y", "xy", "myVariablE"
@@ -122,7 +117,9 @@ fn declare_cmp_box(input: &str) -> IResult<&str, Command, Error<&str>> {
         ),
         map(
             tuple((tag("box"), space0, expr)),
-            |(x, _, value): (&str, _, f32)| Command::DrawShapeWf32((x.to_string(), value, value)),
+            |(x, _, value): (&str, _, Vec<Operation>)| {
+                Command::DrawShapeWf32((x.to_string(), value.clone(), value.clone()))
+            },
         ),
     ))(input)
 }
@@ -155,7 +152,7 @@ fn term(input: &str) -> IResult<&str, Vec<Operation>, Error<&str>> {
     }
 }
 
-fn expr(input: &str) -> IResult<&str, Vec<Operation>, Error<&str>> {
+pub fn expr(input: &str) -> IResult<&str, Vec<Operation>, Error<&str>> {
     let (input, mut operations) = term(input)?;
     let (input, mut more) = many0(map(
         tuple((factor, alt((char('+'), char('-'))), factor)),
@@ -177,7 +174,13 @@ pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {
     many0(terminated(
         alt((
             preceded(multispace0, declare_cmp_box),
-            preceded(multispace0, assignment),
+            // inside alt combinator all the functions have to be of the same type.. we choose Command type
+            preceded(
+                multispace0,
+                map(assignment, |(name, val): (String, Vec<Operation>)| {
+                    Command::DeclareVariable((name, val))
+                }),
+            ),
             preceded(multispace0, declare_box),
         )),
         multispace0,
@@ -194,9 +197,58 @@ mod tests {
         let (_, commands) = parser("x: 2").unwrap();
         for command in commands {
             if let Command::DeclareVariable((name, value)) = command {
-                variables.insert(name, value);
+                variables.insert(name, eval(value));
             }
         }
         assert_eq!(variables.get("x"), Some(&2.0));
     }
+    #[test]
+    fn test_first() {
+        let expression = "x: 3\ny: 1\nz: y * 2.0\n";
+        let (rest, ast) = parse(expression).unwrap();
+        assert_eq!(
+            ast[0].tokens[0],
+            Token::Assignment((
+                "x".to_string(),
+                vec![Operation::Identity(Value::Number(3.0))]
+            ))
+        );
+        assert_eq!(
+            ast[1].tokens[0],
+            Token::Assignment((
+                "y".to_string(),
+                vec![Operation::Identity(Value::Number(1.0))]
+            ))
+        );
+        assert_eq!(
+            &ast[2].tokens[0],
+            &Token::Assignment((
+                "z".to_string(),
+                vec![Operation::Mult((
+                    Value::Variable("y".to_string()),
+                    Value::Number(2.0)
+                ))]
+            ))
+        );
+        assert_eq!(rest, "");
+    }
+}
+
+fn eval(input: Vec<Operation>) -> f32 {
+    let mut evaluated = 0.0;
+    for x in input {
+        match x {
+            Operation::Identity(val) => match val {
+                Value::Number(x) => {
+                    evaluated = x;
+                }
+                Value::Variable(_) => {}
+            },
+            Operation::Plus((_, _)) => {}
+            Operation::Minus((_, _)) => {}
+            Operation::Mult((_, _)) => {}
+            Operation::Div((_, _)) => {}
+        }
+    }
+    evaluated
 }

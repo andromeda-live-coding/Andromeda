@@ -106,7 +106,8 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             Command::DrawShapeWf32((shape, val1, val2)) => {
                 draw.quad()
                      .x_y(position.0, position.1)
-                     .w_h(*val1, *val2)
+                     // eval Vec<Operation>
+                     .w_h(0.0, 0.0)
                      .color(color);
             }
         }
@@ -133,7 +134,8 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                     for x in ast.to_owned() {
                         match x {
                             Command::DeclareVariable((key, value)) => {
-                                model.variables.insert(key, value);
+                                // eval Vec<Operation>
+                                model.variables.insert(key, 0.0);
                             }
                             _ => (),
                         }
