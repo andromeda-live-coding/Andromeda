@@ -23,12 +23,7 @@ pub enum Command {
     DrawShape(String),
     // box var var
     DrawShapeWf32((String, Vec<Operation>, Vec<Operation>)),
-}
-
-#[derive(Debug, PartialEq)]
-enum Token {
-    Assignment((String, Vec<Operation>)),
-    VariableName(String),
+    Token(),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -46,17 +41,6 @@ pub enum Operation {
     Div((Value, Value)),
 }
 
-#[derive(Debug)]
-struct Block {
-    tokens: Vec<Token>,
-}
-
-impl Block {
-    pub fn new(tokens: Vec<Token>) -> Self {
-        Self { tokens }
-    }
-}
-
 // it recognizes a variable name like "x", "y", "xy", "myVariablE"
 fn variable_name(input: &str) -> IResult<&str, String, Error<&str>> {
     map(alpha1, |x: &str| x.to_string())(input)
@@ -67,25 +51,6 @@ fn assignment(input: &str) -> IResult<&str, (String, Vec<Operation>), Error<&str
         tuple((variable_name, space0, char(':'), space0, expr)),
         |(variable_name, _, _, _, value)| (variable_name, value),
     )(input)
-}
-
-fn token(input: &str) -> IResult<&str, Token, Error<&str>> {
-    alt((
-        map(assignment, |(name, value)| Token::Assignment((name, value))),
-        map(variable_name, |name| Token::VariableName(name)),
-    ))(input)
-}
-
-fn tokens(input: &str) -> IResult<&str, Vec<Token>, Error<&str>> {
-    many0(map(tuple((space0, token, space0)), |(_, token, _)| token))(input)
-}
-
-fn block(input: &str) -> IResult<&str, Block, Error<&str>> {
-    map(tuple((tokens, tag("\n"))), |(tokens, _)| Block::new(tokens))(input)
-}
-
-fn parse(input: &str) -> IResult<&str, Vec<Block>, Error<&str>> {
-    many0(block)(input)
 }
 
 fn value(input: &str) -> IResult<&str, Value, Error<&str>> {
@@ -187,53 +152,6 @@ pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {
     ))(input)
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn declare_variable() {
-        let mut variables: HashMap<String, f32> = HashMap::new();
-        let (_, commands) = parser("x: 2").unwrap();
-        for command in commands {
-            if let Command::DeclareVariable((name, value)) = command {
-                variables.insert(name, eval(value));
-            }
-        }
-        assert_eq!(variables.get("x"), Some(&2.0));
-    }
-    #[test]
-    fn test_first() {
-        let expression = "x: 3\ny: 1\nz: y * 2.0\n";
-        let (rest, ast) = parse(expression).unwrap();
-        assert_eq!(
-            ast[0].tokens[0],
-            Token::Assignment((
-                "x".to_string(),
-                vec![Operation::Identity(Value::Number(3.0))]
-            ))
-        );
-        assert_eq!(
-            ast[1].tokens[0],
-            Token::Assignment((
-                "y".to_string(),
-                vec![Operation::Identity(Value::Number(1.0))]
-            ))
-        );
-        assert_eq!(
-            &ast[2].tokens[0],
-            &Token::Assignment((
-                "z".to_string(),
-                vec![Operation::Mult((
-                    Value::Variable("y".to_string()),
-                    Value::Number(2.0)
-                ))]
-            ))
-        );
-        assert_eq!(rest, "");
-    }
-}
-
 fn eval(input: Vec<Operation>) -> f32 {
     let mut evaluated = 0.0;
     for x in input {
@@ -251,4 +169,55 @@ fn eval(input: Vec<Operation>) -> f32 {
         }
     }
     evaluated
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn declare_variable() {
+        let mut variables: HashMap<String, f32> = HashMap::new();
+        let (_, commands) = parser("x: 2").unwrap();
+        for command in commands {
+            if let Command::DeclareVariable((name, value)) = command {
+                variables.insert(name, eval(value));
+            }
+        }
+        assert_eq!(variables.get("x"), Some(&2.0));
+    }
+    #[test]
+    fn test_simple_expression() {
+        let expression = "x: 3\ny: 1\nz: y * 2.0\n";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(
+            ast[0],
+            Command::DeclareVariable((
+                "x".to_string(),
+                vec![Operation::Identity(Value::Number(3.0))]
+            ))
+        );
+        assert_eq!(
+            ast[1],
+            Command::DeclareVariable((
+                "y".to_string(),
+                vec![Operation::Identity(Value::Number(1.0))]
+            ))
+        );
+        assert_eq!(
+            ast[2],
+            Command::DeclareVariable((
+                "z".to_string(),
+                vec![Operation::Mult((
+                    Value::Variable("y".to_string()),
+                    Value::Number(2.0)
+                ))]
+            ))
+        );
+        assert_eq!(rest, "");
+    }
+    fn _test_cmp_expression() {
+        let _expression = "x: 12\n y:25\nz:9*x";
+    }
+
 }

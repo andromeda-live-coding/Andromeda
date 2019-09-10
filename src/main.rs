@@ -110,6 +110,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                      .w_h(0.0, 0.0)
                      .color(color);
             }
+            Command::Token() => {},
         }
     }
     // Write the result of our drawing to the window's frame.
