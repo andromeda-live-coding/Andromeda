@@ -128,7 +128,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_something() {
+    fn declare_variable() {
         let mut variables: HashMap<String, f32> = HashMap::new();
         let (_, commands) = parser("x: 2").unwrap();
         for command in commands {
@@ -136,6 +136,6 @@ mod tests {
                 variables.insert(name, value);
             }
         }
-        assert_eq!(false, true);
+        assert_eq!(variables.get("x"), Some(&2.0));
     }
 }

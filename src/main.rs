@@ -95,30 +95,19 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     let color = rgb(1.0, 1.0, 1.0);
     for x in &model.instructions {
         match x {
+            Command::VariableName(_) => {}
             Command::DeclareVariable((_, _)) => {}
             Command::DrawShape(shape) => {
-                draw_shape(
-                    &draw,
-                    shape.as_ref(),
-                    position.0,
-                    position.1,
-                    std_value,
-                    std_value,
-                    (color.red, color.green, color.blue),
-                );
+                draw.quad()
+                     .x_y(position.0, position.1)
+                     .w_h(std_value, std_value)
+                     .color(color);
             }
-
-            // f32 values must arrive, so we have to convert strings on the parser side
             Command::DrawShapeWf32((shape, val1, val2)) => {
-                draw_shape(
-                    &draw,
-                    shape.as_ref(),
-                    position.0,
-                    position.1,
-                    *val1,
-                    *val2,
-                    (color.red, color.green, color.blue),
-                );
+                draw.quad()
+                     .x_y(position.0, position.1)
+                     .w_h(*val1, *val2)
+                     .color(color);
             }
         }
     }
@@ -127,32 +116,6 @@ fn view(app: &App, model: &Model, frame: &Frame) {
 
     // Draw the state of the `Ui` to the frame.
     model.ui.draw_to_frame(app, &frame).unwrap();
-
-    fn draw_shape(
-        c: &Draw,
-        shape: &str,
-        x: f32,
-        y: f32,
-        val1: f32,
-        val2: f32,
-        color: (f32, f32, f32),
-    ) {
-        match shape {
-            "box" => {
-                c.quad()
-                    .x_y(x, y)
-                    .w_h(val1, val2)
-                    .color(rgb(color.0, color.1, color.2));
-            }
-            "circle" => {
-                c.ellipse()
-                    .x_y(x, y)
-                    .w_h(val1, val2)
-                    .color(rgb(color.0, color.1, color.2));
-            }
-            _ => (),
-        }
-    }
 }
 
 fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
@@ -161,13 +124,27 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
             // when user press Lcontrol
             if key == nannou::prelude::Key::LControl {
                 model.variables = HashMap::new();
-                if let Ok((_, ast)) = parser::parser(&model.text_edit) {
+                if let Ok((remaining, ast)) = parser::parser(&model.text_edit) {
+                    let mut syntactic_analysis = true;
+                    if remaining != "" {
+                        syntactic_analysis = false;
+                    }
+                    // storing variables
                     for x in ast.to_owned() {
                         match x {
-                            Command::DeclareVariable((key, value)) => {}
-                            Command::DrawShapeWf32((shape, val1, val2)) => {}
+                            Command::DeclareVariable((key, value)) => {
+                                model.variables.insert(key, value);
+                            }
                             _ => (),
                         }
+                    }
+                    // we update our model only if
+                    if syntactic_analysis {
+                        model.instructions = ast;
+                    } else {
+                        println!("{}", "CAN'T UPDATE ABSTRACT SYNTAX TREE".red().bold());
+                        println!("{:#?}", parser::parser(&model.text_edit));
+                        println!("{} {}", "error:".red().bold(), &remaining.red().bold());
                     }
                 }
             }
