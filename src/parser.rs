@@ -23,13 +23,13 @@ pub enum Command {
     DrawShape(String),
     // box var var
     DrawShapeWf32((String, Vec<Operation>, Vec<Operation>)),
-    Token(),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 enum Value {
     Variable(String),
     Number(f32),
+    Operation(Box<Operation>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -110,6 +110,7 @@ fn term(input: &str) -> IResult<&str, Vec<Operation>, Error<&str>> {
             }
         },
     ))(input)?;
+    // what
     if more.len() == 0 {
         Ok((first_input, vec![Operation::Identity(first)]))
     } else {
@@ -161,6 +162,7 @@ fn eval(input: Vec<Operation>) -> f32 {
                     evaluated = x;
                 }
                 Value::Variable(_) => {}
+                Value::Operation(_) => {}
             },
             Operation::Plus((_, _)) => {}
             Operation::Minus((_, _)) => {}
@@ -216,8 +218,23 @@ mod tests {
         );
         assert_eq!(rest, "");
     }
-    fn _test_cmp_expression() {
-        let _expression = "x: 12\n y:25\nz:9*x";
-    }
 
+    #[test]
+    fn test_several_operations() {
+        let expression = "x: 3\ny: 1\nz: y + 2.0 * x\n";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(
+            ast[2],
+            Command::DeclareVariable((
+                "z".to_string(),
+                vec![Operation::Plus((
+                    Value::Variable("y".to_string()),
+                    Value::Operation(Box::new(Operation::Mult((
+                        Value::Number(2.0),
+                        Value::Variable("x".to_string())
+                    ))))
+                ))]
+            ))
+        );
+    }
 }
