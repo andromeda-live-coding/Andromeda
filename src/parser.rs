@@ -7,7 +7,7 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, multispace0, space0};
 use nom::combinator::map;
-use nom::error::VerboseError;
+use nom::error::VerboseError as Error;
 use nom::multi::{fold_many0, many0};
 use nom::number::complete::float;
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
@@ -25,31 +25,85 @@ pub enum Command {
     DrawShapeWf32((String, f32, f32)),
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub enum Token {
+#[derive(Debug, PartialEq)]
+enum Token {
+    Assignment((String, Vec<Operation>)),
+    VariableName(String),
     Number(f32),
-    Variable(String),
 }
 
-fn number(input: &str) -> IResult<&str, Token, VerboseError<&str>> {
+#[derive(Debug, PartialEq, Clone)]
+enum Value {
+    Variable(String),
+    Number(f32),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+enum Operation {
+    Identity(Value),
+    Plus((Value, Value)),
+    Minus((Value, Value)),
+    Mult((Value, Value)),
+    Div((Value, Value)),
+}
+
+#[derive(Debug)]
+struct Block {
+    tokens: Vec<Token>,
+}
+
+impl Block {
+    pub fn new(tokens: Vec<Token>) -> Self {
+        Self { tokens }
+    }
+}
+
+fn number(input: &str) -> IResult<&str, Token, Error<&str>> {
     map(float, |x| Token::Number(x))(input)
 }
 
 // it recognizes a variable name like "x", "y", "xy", "myVariablE"
-fn variable(input: &str) -> IResult<&str, String, VerboseError<&str>> {
+fn variable_name(input: &str) -> IResult<&str, String, Error<&str>> {
     map(alpha1, |x: &str| x.to_string())(input)
 }
-
 // it recognizes pattern **x: expr**
-fn variable_declaration(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
+fn assignment(input: &str) -> IResult<&str, (String, Vec<Operation>), Error<&str>> {
     map(
-        tuple((variable, space0, tag(":"), space0, expr)),
-        |(name, _, _, _, value)| Command::DeclareVariable((name, value)),
+        tuple((variable_name, space0, char(':'), space0, expr)),
+        |(variable_name, _, _, _, value)| (variable_name, value),
     )(input)
 }
 
+fn token(input: &str) -> IResult<&str, Token, Error<&str>> {
+    alt((
+        map(assignment, |(name, value)| Token::Assignment((name, value))),
+        map(variable_name, |name| Token::VariableName(name)),
+    ))(input)
+}
+
+fn tokens(input: &str) -> IResult<&str, Vec<Token>, Error<&str>> {
+    many0(map(tuple((space0, token, space0)), |(_, token, _)| token))(input)
+}
+
+fn block(input: &str) -> IResult<&str, Block, Error<&str>> {
+    map(tuple((tokens, tag("\n"))), |(tokens, _)| Block::new(tokens))(input)
+}
+
+fn parse(input: &str) -> IResult<&str, Vec<Block>, Error<&str>> {
+    many0(block)(input)
+}
+
+fn value(input: &str) -> IResult<&str, Value, Error<&str>> {
+    alt((
+        map(alpha1, |variable: &str| {
+            Value::Variable(variable.to_string())
+        }),
+        map(float, |number: f32| Value::Number(number)),
+    ))(input)
+}
+
 // it recognizes pattern **box**
-fn declare_box(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
+fn declare_box(input: &str) -> IResult<&str, Command, Error<&str>> {
     map(tag("box"), |shape: &str| {
         Command::DrawShape(shape.to_string())
     })(input)
@@ -58,7 +112,7 @@ fn declare_box(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
 // *****box variable*****
 // So here if we find ******box variable***** we have to find the value of the variable on the HashMap and set the command
 // Command::DrawShapeWf32((shape.to_string(), val1, val2))
-fn declare_cmp_box(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
+fn declare_cmp_box(input: &str) -> IResult<&str, Command, Error<&str>> {
     alt((
         map(
             tuple((tag("box"), space0, expr, space0, expr)),
@@ -74,49 +128,56 @@ fn declare_cmp_box(input: &str) -> IResult<&str, Command, VerboseError<&str>> {
 }
 
 // We parse any expr surrounded by parens, ignoring all whitespaces around those
-fn parens(i: &str) -> IResult<&str, f32, VerboseError<&str>> {
-    delimited(space0, delimited(tag("("), expr, tag(")")), space0)(i)
+// fn parens(i: &str) -> IResult<&str, f32, Error<&str>> {
+//     delimited(space0, delimited(tag("("), expr, tag(")")), space0)(i)
+// }
+
+fn factor(input: &str) -> IResult<&str, Value, Error<&str>> {
+    map(tuple((space0, value, space0)), |(_, value, _)| value)(input)
 }
 
-fn factor(i: &str) -> IResult<&str, f32, VerboseError<&str>> {
-    alt((map(delimited(space0, float, space0), |x| x), parens))(i)
-}
-
-fn term(i: &str) -> IResult<&str, f32, VerboseError<&str>> {
-    let (i, init) = factor(i)?;
-    fold_many0(
-        pair(alt((char('*'), char('/'))), factor),
-        init,
-        |acc, (op, val): (char, f32)| {
+fn term(input: &str) -> IResult<&str, Vec<Operation>, Error<&str>> {
+    let (first_input, first) = factor(input)?;
+    let (input, more) = many0(map(
+        tuple((factor, alt((char('*'), char('/'))), factor)),
+        |(first, op, second)| {
             if op == '*' {
-                acc * val
+                Operation::Mult((first, second))
             } else {
-                acc / val
+                Operation::Div((first, second))
             }
         },
-    )(i)
+    ))(input)?;
+    if more.len() == 0 {
+        Ok((first_input, vec![Operation::Identity(first)]))
+    } else {
+        Ok((input, more))
+    }
 }
 
-pub fn expr(i: &str) -> IResult<&str, f32, VerboseError<&str>> {
-    let (i, init) = term(i)?;
-    fold_many0(
-        pair(alt((char('+'), char('-'))), term),
-        init,
-        |acc, (op, val): (char, f32)| {
+fn expr(input: &str) -> IResult<&str, Vec<Operation>, Error<&str>> {
+    let (input, mut operations) = term(input)?;
+    let (input, mut more) = many0(map(
+        tuple((factor, alt((char('+'), char('-'))), factor)),
+        |(first, op, second)| {
             if op == '+' {
-                acc + val
+                Operation::Plus((first, second))
             } else {
-                acc - val
+                Operation::Minus((first, second))
             }
         },
-    )(i)
+    ))(input)?;
+    let mut res = vec![];
+    res.append(&mut operations);
+    res.append(&mut more);
+    Ok((input, res))
 }
 
-pub fn parser(input: &str) -> IResult<&str, Vec<Command>, VerboseError<&str>> {
+pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {
     many0(terminated(
         alt((
             preceded(multispace0, declare_cmp_box),
-            preceded(multispace0, variable_declaration),
+            preceded(multispace0, assignment),
             preceded(multispace0, declare_box),
         )),
         multispace0,
