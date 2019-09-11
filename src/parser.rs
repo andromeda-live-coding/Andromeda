@@ -13,6 +13,8 @@ use nom::number::complete::float;
 use nom::sequence::{delimited, preceded, terminated, tuple};
 use nom::IResult;
 
+use std::ops::{Add, Div, Mul, Sub};
+
 #[derive(Debug, PartialEq, Clone)]
 pub enum Builtin {
     Plus,
@@ -38,6 +40,38 @@ pub enum Atom {
 pub enum Operation {
     Identity(Factor),
     Calculation((Box<Operation>, Builtin, Box<Operation>)),
+}
+
+impl Mul for Operation {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self {
+        Operation::Calculation((Box::new(self), Builtin::Mult, Box::new(rhs)))
+    }
+}
+
+impl Div for Operation {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self {
+        Operation::Calculation((Box::new(self), Builtin::Div, Box::new(rhs)))
+    }
+}
+
+impl Add for Operation {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self {
+        Operation::Calculation((Box::new(self), Builtin::Plus, Box::new(rhs)))
+    }
+}
+
+impl Sub for Operation {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self {
+        Operation::Calculation((Box::new(self), Builtin::Minus, Box::new(rhs)))
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -112,7 +146,10 @@ pub fn expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
     for atom in atoms.clone().iter() {
         match atom {
             Atom::Factor(factor) => {
-                factors.push(Operation::Identity(factor.clone()));
+                factors.push(match factor {
+                    Factor::Operation(operation) => *operation.clone(),
+                    _ => Operation::Identity(factor.clone()),
+                });
             }
             Atom::Builtin(operator) => {
                 if operators.len() > 0 {
@@ -120,11 +157,12 @@ pub fn expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
                         let op = operators.pop().unwrap();
                         let second = factors.pop().unwrap();
                         let first = factors.pop().unwrap();
-                        factors.push(Operation::Calculation((
-                            Box::new(first),
-                            op,
-                            Box::new(second),
-                        )))
+                        factors.push(match op {
+                            Builtin::Plus => first + second,
+                            Builtin::Minus => first - second,
+                            Builtin::Div => first / second,
+                            Builtin::Mult => first * second,
+                        })
                     }
                 }
                 operators.push(operator.clone());
@@ -136,11 +174,12 @@ pub fn expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
         let op = operators.pop().unwrap();
         let second = factors.pop().unwrap();
         let first = factors.pop().unwrap();
-        factors.push(Operation::Calculation((
-            Box::new(first),
-            op,
-            Box::new(second),
-        )))
+        factors.push(match op {
+            Builtin::Plus => first + second,
+            Builtin::Minus => first - second,
+            Builtin::Div => first / second,
+            Builtin::Mult => first * second,
+        })
     }
 
     // https://stackoverflow.com/questions/28256/equation-expression-parser-with-precedence#47717
@@ -182,11 +221,8 @@ mod tests {
             ast[0],
             Expression::Declaration((
                 "z".to_string(),
-                Operation::Calculation((
-                    Box::new(Operation::Identity(Factor::Variable("y".to_string()))),
-                    Builtin::Plus,
-                    Box::new(Operation::Identity(Factor::Number(2.0))),
-                ))
+                Operation::Identity(Factor::Variable("y".to_string()))
+                    + Operation::Identity(Factor::Number(2.0))
             ))
         );
     }
@@ -200,15 +236,9 @@ mod tests {
             ast[0],
             Expression::Declaration((
                 "z".to_string(),
-                Operation::Calculation((
-                    Box::new(Operation::Identity(Factor::Variable("y".to_string()))),
-                    Builtin::Plus,
-                    Box::new(Operation::Calculation((
-                        Box::new(Operation::Identity(Factor::Number(2.0))),
-                        Builtin::Plus,
-                        Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
-                    ))),
-                ))
+                Operation::Identity(Factor::Variable("y".to_string()))
+                    + (Operation::Identity(Factor::Number(2.0))
+                        + Operation::Identity(Factor::Variable("x".to_string())))
             ))
         );
     }
@@ -222,19 +252,10 @@ mod tests {
             ast[0],
             Expression::Declaration((
                 "z".to_string(),
-                Operation::Calculation((
-                    Box::new(Operation::Identity(Factor::Variable("y".to_string()))),
-                    Builtin::Plus,
-                    Box::new(Operation::Calculation((
-                        Box::new(Operation::Calculation((
-                            Box::new(Operation::Identity(Factor::Number(2.0))),
-                            Builtin::Mult,
-                            Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
-                        ))),
-                        Builtin::Plus,
-                        Box::new(Operation::Identity(Factor::Number(3.0))),
-                    )))
-                ))
+                Operation::Identity(Factor::Variable("y".to_string()))
+                    + ((Operation::Identity(Factor::Number(2.0))
+                        * Operation::Identity(Factor::Variable("x".to_string())))
+                        + Operation::Identity(Factor::Number(3.0)))
             ))
         );
     }
@@ -242,28 +263,17 @@ mod tests {
     #[test]
     fn declare_variable_with_expression_and_parenthesis() {
         let expression = "z: (y + 2.0) * x + 3";
-        let (rest, ast) = parse(expression).unwrap();
+        let (rest, ast) = parser(expression).unwrap();
 
         assert_eq!(rest, "");
         assert_eq!(
             ast[0],
             Expression::Declaration((
                 "z".to_string(),
-                Operation::Calculation((
-                    Box::new(Operation::Calculation((
-                        Box::new(Operation::Identity(Factor::Operation(Box::new(
-                            Operation::Calculation((
-                                Box::new(Operation::Identity(Factor::Variable("y".to_string()))),
-                                Builtin::Plus,
-                                Box::new(Operation::Identity(Factor::Number(2.0))),
-                            ))
-                        )))),
-                        Builtin::Mult,
-                        Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
-                    ))),
-                    Builtin::Plus,
-                    Box::new(Operation::Identity(Factor::Number(3.0))),
-                ))
+                (Operation::Identity(Factor::Variable("y".to_string()))
+                    + Operation::Identity(Factor::Number(2.0)))
+                    * Operation::Identity(Factor::Variable("x".to_string()))
+                    + Operation::Identity(Factor::Number(3.0))
             ))
         )
     }
@@ -271,7 +281,7 @@ mod tests {
     #[test]
     fn declare_variable_with_complicate_expression() {
         let expression = "z: (1 * (2.0 + 5 / (4 - 2))) ";
-        let (rest, ast) = parser(expression).unwrap();
+        let (rest, _ast) = parser(expression).unwrap();
 
         assert_eq!(rest, "");
         // TODO: Assert AST result
