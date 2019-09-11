@@ -19,10 +19,12 @@ fn declare_variable(
         Operation::Calculation((first, op, second)) => {
             let first = match *first {
                 Operation::Identity(first) => get_value(first, variables),
+                // TODO: This should be implemented
                 _ => unimplemented!(),
             };
             let second = match *second {
                 Operation::Identity(second) => get_value(second, variables),
+                // TODO: This should be implemented
                 _ => unimplemented!(),
             };
             match op {
@@ -37,6 +39,8 @@ fn declare_variable(
 
 fn main() {
     let content = "x: 2\ny: x\nz: x + 2";
+    // TODO: Try with this content
+    // let content = "x: 2\ny: x\nz: x + 2 + 3";
     let (_, ast) = parser(content).unwrap();
     let mut variables: HashMap<String, f32> = HashMap::new();
     for expression in ast {
