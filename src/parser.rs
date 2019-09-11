@@ -4,6 +4,7 @@
 // **IMPORTANT** MVC has just to do DrawShapeWf32(shape, val1, val2) where val1 and val2 are f32!
 // i need an HashMap inside the parser because we need to keep track of all variables in the context.
 use nom::branch::alt;
+use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, multispace0, one_of, space0};
 use nom::combinator::map;
 use nom::error::VerboseError as Error;
@@ -70,13 +71,13 @@ pub fn factor(input: &str) -> IResult<&str, Factor, Error<&str>> {
         tuple((
             space0,
             alt((
-                // delimited(
-                //     char('('),
-                //     map(expr, |operation: Operation| {
-                //         Factor::Operation(Box::new(operation))
-                //     }),
-                //     char(')'),
-                // ),
+                delimited(
+                    tag("("),
+                    map(expr, |operation: Operation| {
+                        Factor::Operation(Box::new(operation))
+                    }),
+                    tag(")"),
+                ),
                 map(alpha1, |variable: &str| {
                     Factor::Variable(variable.to_string())
                 }),
@@ -104,7 +105,7 @@ pub fn has_higher_precedence(first: &Builtin, second: &Builtin) -> bool {
 }
 
 pub fn expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
-    let (_, atoms) = many0(atom)(input)?;
+    let (input, atoms) = many0(atom)(input)?;
     let mut factors: Vec<Operation> = vec![];
     let mut operators: Vec<Builtin> = vec![];
 
@@ -143,7 +144,7 @@ pub fn expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
     }
 
     // https://stackoverflow.com/questions/28256/equation-expression-parser-with-precedence#47717
-    Ok(("", factors.first().unwrap().clone()))
+    Ok((input, factors.first().unwrap().clone()))
 }
 
 pub fn parser(input: &str) -> IResult<&str, Vec<Expression>, Error<&str>> {
@@ -170,6 +171,24 @@ mod tests {
             Expression::Declaration(("x".to_string(), Operation::Identity(Factor::Number(2.0))))
         );
         assert_eq!(rest, "");
+    }
+
+    #[test]
+    fn declare_variable_with_expression_only_sum_of_two_elements() {
+        let expression = "z: y + 2.0\n";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(
+            ast[0],
+            Expression::Declaration((
+                "z".to_string(),
+                Operation::Calculation((
+                    Box::new(Operation::Identity(Factor::Variable("y".to_string()))),
+                    Builtin::Plus,
+                    Box::new(Operation::Identity(Factor::Number(2.0))),
+                ))
+            ))
+        );
     }
 
     #[test]
@@ -222,8 +241,9 @@ mod tests {
 
     #[test]
     fn declare_variable_with_expression_and_parenthesis() {
-        let expression = "z: (y + 2.0) * x + 3\n";
-        let (rest, ast) = parser(expression).unwrap();
+        let expression = "z: (y + 2.0) * x + 3";
+        let (rest, ast) = parse(expression).unwrap();
+
         assert_eq!(rest, "");
         assert_eq!(
             ast[0],
@@ -231,11 +251,13 @@ mod tests {
                 "z".to_string(),
                 Operation::Calculation((
                     Box::new(Operation::Calculation((
-                        Box::new(Operation::Calculation((
-                            Box::new(Operation::Identity(Factor::Variable("y".to_string()))),
-                            Builtin::Plus,
-                            Box::new(Operation::Identity(Factor::Number(2.0)))
-                        ))),
+                        Box::new(Operation::Identity(Factor::Operation(Box::new(
+                            Operation::Calculation((
+                                Box::new(Operation::Identity(Factor::Variable("y".to_string()))),
+                                Builtin::Plus,
+                                Box::new(Operation::Identity(Factor::Number(2.0))),
+                            ))
+                        )))),
                         Builtin::Mult,
                         Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
                     ))),
@@ -244,5 +266,14 @@ mod tests {
                 ))
             ))
         )
+    }
+
+    #[test]
+    fn declare_variable_with_complicate_expression() {
+        let expression = "z: (1 * (2.0 + 5 / (4 - 2))) ";
+        let (rest, ast) = parser(expression).unwrap();
+
+        assert_eq!(rest, "");
+        // TODO: Assert AST result
     }
 }
