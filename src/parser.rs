@@ -124,6 +124,17 @@ pub fn expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
         }
     }
 
+    while operators.len() > 0 {
+        let op = operators.pop().unwrap();
+        let second = factors.pop().unwrap();
+        let first = factors.pop().unwrap();
+        factors.push(Operation::Calculation((
+            Box::new(first),
+            op,
+            Box::new(second),
+        )))
+    }
+
     // TODO: Apply the shunting yard algorithm here
     // https://stackoverflow.com/questions/28256/equation-expression-parser-with-precedence#47717
     dbg!(factors.clone());
