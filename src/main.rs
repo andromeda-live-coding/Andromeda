@@ -10,6 +10,28 @@ fn get_value(factor: Factor, variables: &HashMap<String, f32>) -> f32 {
     }
 }
 
+fn calculate(
+    first: Operation,
+    op: Builtin,
+    second: Operation,
+    variables: &HashMap<String, f32>,
+) -> f32 {
+    let first = match first {
+        Operation::Identity(first) => get_value(first, variables),
+        Operation::Calculation((first, op, second)) => calculate(*first, op, *second, variables),
+    };
+    let second = match second {
+        Operation::Identity(second) => get_value(second, variables),
+        Operation::Calculation((first, op, second)) => calculate(*first, op, *second, variables),
+    };
+    match op {
+        Builtin::Plus => first + second,
+        Builtin::Minus => first - second,
+        Builtin::Div => first / second,
+        Builtin::Mult => first * second,
+    }
+}
+
 fn declare_variable(
     (name, value): (String, Operation),
     variables: &HashMap<String, f32>,
@@ -17,30 +39,14 @@ fn declare_variable(
     match value {
         Operation::Identity(factor) => (name, get_value(factor, variables)),
         Operation::Calculation((first, op, second)) => {
-            let first = match *first {
-                Operation::Identity(first) => get_value(first, variables),
-                // TODO: This should be implemented
-                _ => unimplemented!(),
-            };
-            let second = match *second {
-                Operation::Identity(second) => get_value(second, variables),
-                // TODO: This should be implemented
-                _ => unimplemented!(),
-            };
-            match op {
-                Builtin::Plus => (name, first + second),
-                Builtin::Minus => (name, first - second),
-                Builtin::Div => (name, first / second),
-                Builtin::Mult => (name, first * second),
-            }
+            (name, calculate(*first, op, *second, variables))
         }
     }
 }
 
 fn main() {
-    let content = "x: 2\ny: x\nz: x + 2";
-    // TODO: Try with this content
-    // let content = "x: 2\ny: x\nz: x + 2 + 3";
+    // Tiè
+    let content = "x: 2\ny: x\nx: 1\nz: ((x + (2 + 3)) * y) / 2";
     let (_, ast) = parser(content).unwrap();
     let mut variables: HashMap<String, f32> = HashMap::new();
     for expression in ast {
@@ -51,5 +57,7 @@ fn main() {
             }
         }
     }
-    dbg!(variables.clone());
+    assert_eq!(*variables.get("x").unwrap(), 1.0);
+    assert_eq!(*variables.get("y").unwrap(), 2.0);
+    assert_eq!(*variables.get("z").unwrap(), 6.0);
 }
