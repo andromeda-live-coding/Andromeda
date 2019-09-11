@@ -1,16 +1,11 @@
-// *****parser*****
-// it recognizes *instructions* like "box x y"
-// i need to convert variables in f32, if the variables were previously declared
-// **IMPORTANT** MVC has just to do DrawShapeWf32(shape, val1, val2) where val1 and val2 are f32!
-// i need an HashMap inside the parser because we need to keep track of all variables in the context.
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, multispace0, one_of, space0};
 use nom::combinator::map;
 use nom::error::VerboseError as Error;
-use nom::multi::many0;
+use nom::multi::{fold_many0, many0, many_m_n};
 use nom::number::complete::float;
-use nom::sequence::{delimited, preceded, terminated, tuple};
+use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 use nom::IResult;
 
 use std::ops::{Add, Div, Mul, Sub};
@@ -27,13 +22,6 @@ pub enum Builtin {
 pub enum Factor {
     Variable(String),
     Number(f32),
-    Operation(Box<Operation>),
-}
-
-#[derive(Debug, PartialEq, Clone)]
-pub enum Atom {
-    Factor(Factor),
-    Builtin(Builtin),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -75,47 +63,49 @@ impl Sub for Operation {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum Node {
+    Square((Operation, Operation)),
+    Circle(Operation),
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Command {
     Declaration((String, Operation)),
+    Instantiation(Node),
 }
 
-pub fn variable_name(input: &str) -> IResult<&str, String, Error<&str>> {
-    map(alpha1, |x: &str| x.to_string())(input)
-}
-
-pub fn assignment(input: &str) -> IResult<&str, (String, Operation), Error<&str>> {
-    map(
-        tuple((variable_name, space0, char(':'), space0, expr)),
-        |(variable_name, _, _, _, value)| (variable_name, value),
-    )(input)
-}
-
-pub fn builtin(input: &str) -> IResult<&str, Atom, Error<&str>> {
-    map(one_of("+-*/"), |op| match op {
-        '+' => Atom::Builtin(Builtin::Plus),
-        '-' => Atom::Builtin(Builtin::Minus),
-        '*' => Atom::Builtin(Builtin::Mult),
-        '/' => Atom::Builtin(Builtin::Div),
+pub fn mult(input: &str) -> IResult<&str, Builtin, Error<&str>> {
+    map(one_of("*/"), |op| match op {
+        '*' => Builtin::Mult,
+        '/' => Builtin::Div,
         _ => unreachable!(),
     })(input)
 }
 
-pub fn factor(input: &str) -> IResult<&str, Factor, Error<&str>> {
+pub fn sum(input: &str) -> IResult<&str, Builtin, Error<&str>> {
+    map(one_of("+-"), |op| match op {
+        '+' => Builtin::Plus,
+        '-' => Builtin::Minus,
+        _ => unreachable!(),
+    })(input)
+}
+
+pub fn variable(input: &str) -> IResult<&str, Factor, Error<&str>> {
+    map(alpha1, |name: &str| Factor::Variable(name.to_string()))(input)
+}
+
+pub fn number(input: &str) -> IResult<&str, Factor, Error<&str>> {
+    map(float, |value: f32| Factor::Number(value))(input)
+}
+
+pub fn factor(input: &str) -> IResult<&str, Operation, Error<&str>> {
     map(
         tuple((
             space0,
             alt((
-                delimited(
-                    tag("("),
-                    map(expr, |operation: Operation| {
-                        Factor::Operation(Box::new(operation))
-                    }),
-                    tag(")"),
-                ),
-                map(alpha1, |variable: &str| {
-                    Factor::Variable(variable.to_string())
-                }),
-                map(float, |number: f32| Factor::Number(number)),
+                delimited(tag("("), expr, tag(")")),
+                map(variable, Operation::Identity),
+                map(number, Operation::Identity),
             )),
             space0,
         )),
@@ -123,77 +113,77 @@ pub fn factor(input: &str) -> IResult<&str, Factor, Error<&str>> {
     )(input)
 }
 
-pub fn atom(input: &str) -> IResult<&str, Atom, Error<&str>> {
-    alt((builtin, map(factor, |f| Atom::Factor(f))))(input)
-}
+fn term(i: &str) -> IResult<&str, Operation, Error<&str>> {
+    let (i, init) = factor(i)?;
 
-pub fn has_higher_precedence(first: &Builtin, second: &Builtin) -> bool {
-    match first {
-        Builtin::Mult | Builtin::Div => match second {
-            Builtin::Plus => true,
-            Builtin::Minus => true,
-            _ => false,
+    fold_many0(
+        pair(mult, factor),
+        init,
+        |acc, (op, val): (Builtin, Operation)| match op {
+            Builtin::Mult => acc * val,
+            Builtin::Div => acc / val,
+            _ => unreachable!(),
         },
-        Builtin::Plus | Builtin::Minus => false,
-    }
+    )(i)
 }
 
-pub fn expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
-    let (input, atoms) = many0(atom)(input)?;
-    let mut factors: Vec<Operation> = vec![];
-    let mut operators: Vec<Builtin> = vec![];
+fn expr(i: &str) -> IResult<&str, Operation, Error<&str>> {
+    let (i, init) = term(i)?;
 
-    for atom in atoms.clone().iter() {
-        match atom {
-            Atom::Factor(factor) => {
-                factors.push(match factor {
-                    Factor::Operation(operation) => *operation.clone(),
-                    _ => Operation::Identity(factor.clone()),
-                });
-            }
-            Atom::Builtin(operator) => {
-                if operators.len() > 0 {
-                    if has_higher_precedence(&operators.last().unwrap(), &operator) {
-                        let op = operators.pop().unwrap();
-                        let second = factors.pop().unwrap();
-                        let first = factors.pop().unwrap();
-                        factors.push(match op {
-                            Builtin::Plus => first + second,
-                            Builtin::Minus => first - second,
-                            Builtin::Div => first / second,
-                            Builtin::Mult => first * second,
-                        })
-                    }
-                }
-                operators.push(operator.clone());
-            }
-        }
-    }
+    fold_many0(
+        pair(sum, term),
+        init,
+        |acc, (op, val): (Builtin, Operation)| match op {
+            Builtin::Plus => acc + val,
+            Builtin::Minus => acc - val,
+            _ => unreachable!(),
+        },
+    )(i)
+}
 
-    while operators.len() > 0 {
-        let op = operators.pop().unwrap();
-        let second = factors.pop().unwrap();
-        let first = factors.pop().unwrap();
-        factors.push(match op {
-            Builtin::Plus => first + second,
-            Builtin::Minus => first - second,
-            Builtin::Div => first / second,
-            Builtin::Mult => first * second,
-        })
-    }
+pub fn variable_name(input: &str) -> IResult<&str, String, Error<&str>> {
+    map(alpha1, |x: &str| x.to_string())(input)
+}
 
-    // https://stackoverflow.com/questions/28256/equation-expression-parser-with-precedence#47717
-    Ok((input, factors.first().unwrap().clone()))
+pub fn assignment(input: &str) -> IResult<&str, Command, Error<&str>> {
+    map(
+        tuple((variable_name, space0, char(':'), space0, expr)),
+        |(variable_name, _, _, _, value)| Command::Declaration((variable_name, value)),
+    )(input)
+}
+
+pub fn square(input: &str) -> IResult<&str, Node, Error<&str>> {
+    map(
+        pair(tag("square"), many_m_n(0, 2, expr)),
+        |(_, params)| match (params.get(0), params.get(1)) {
+            (Some(width), Some(height)) => Node::Square((width.clone(), height.clone())),
+            (Some(size), None) => Node::Square((size.clone(), size.clone())),
+            (None, None) => Node::Square((
+                Operation::Identity(Factor::Number(1.0)),
+                Operation::Identity(Factor::Number(1.0)),
+            )),
+            _ => unreachable!(),
+        },
+    )(input)
+}
+
+pub fn circle(input: &str) -> IResult<&str, Node, Error<&str>> {
+    map(
+        pair(tag("circle"), many_m_n(0, 1, expr)),
+        |(_, params)| match params.first() {
+            Some(radius) => Node::Circle(radius.clone()),
+            None => Node::Circle(Operation::Identity(Factor::Number(1.0))),
+        },
+    )(input)
+}
+
+pub fn draw_shape(input: &str) -> IResult<&str, Command, Error<&str>> {
+    map(alt((circle, square)), Command::Instantiation)(input)
 }
 
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {
     many0(terminated(
-        preceded(
-            multispace0,
-            map(assignment, |(name, operation): (String, Operation)| {
-                Command::Declaration((name, operation))
-            }),
-        ),
+        preceded(multispace0, alt((draw_shape, assignment))),
         multispace0,
     ))(input)
 }
@@ -236,9 +226,9 @@ mod tests {
             ast[0],
             Command::Declaration((
                 "z".to_string(),
-                Operation::Identity(Factor::Variable("y".to_string()))
-                    + (Operation::Identity(Factor::Number(2.0))
-                        + Operation::Identity(Factor::Variable("x".to_string())))
+                (Operation::Identity(Factor::Variable("y".to_string()))
+                    + Operation::Identity(Factor::Number(2.0)))
+                    + Operation::Identity(Factor::Variable("x".to_string()))
             ))
         );
     }
@@ -252,10 +242,10 @@ mod tests {
             ast[0],
             Command::Declaration((
                 "z".to_string(),
-                Operation::Identity(Factor::Variable("y".to_string()))
-                    + ((Operation::Identity(Factor::Number(2.0))
-                        * Operation::Identity(Factor::Variable("x".to_string())))
-                        + Operation::Identity(Factor::Number(3.0)))
+                (Operation::Identity(Factor::Variable("y".to_string()))
+                    + (Operation::Identity(Factor::Number(2.0)))
+                        * Operation::Identity(Factor::Variable("x".to_string()))
+                    + Operation::Identity(Factor::Number(3.0)))
             ))
         );
     }
@@ -285,5 +275,95 @@ mod tests {
 
         assert_eq!(rest, "");
         // TODO: Assert AST result
+    }
+
+    #[test]
+    fn square_with_no_params() {
+        let expression = "square";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(
+            ast[0],
+            Command::Instantiation(Node::Square((
+                Operation::Identity(Factor::Number(1.0)),
+                Operation::Identity(Factor::Number(1.0))
+            )))
+        );
+    }
+
+    #[test]
+    fn circle_with_no_params() {
+        let expression = "circle";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(
+            ast[0],
+            Command::Instantiation(Node::Circle(Operation::Identity(Factor::Number(1.0))))
+        );
+    }
+
+    #[test]
+    fn square_with_one_params() {
+        let expression = "square 17.22";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(
+            ast[0],
+            Command::Instantiation(Node::Square((
+                Operation::Identity(Factor::Number(17.22)),
+                Operation::Identity(Factor::Number(17.22))
+            )))
+        );
+    }
+
+    #[test]
+    fn circle_with_one_params() {
+        let expression = "circle 29.93";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(
+            ast[0],
+            Command::Instantiation(Node::Circle(Operation::Identity(Factor::Number(29.93))))
+        );
+    }
+
+    #[test]
+    fn square_with_two_params() {
+        let expression = "square 17.22 22.17";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(
+            ast[0],
+            Command::Instantiation(Node::Square((
+                Operation::Identity(Factor::Number(17.22)),
+                Operation::Identity(Factor::Number(22.17))
+            )))
+        );
+    }
+
+    #[test]
+    fn declaration_and_instantiation() {
+        let expression = "x: 1\n square x x + 3";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(
+            ast[1],
+            Command::Instantiation(Node::Square((
+                Operation::Identity(Factor::Variable("x".to_string())),
+                Operation::Calculation((
+                    Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
+                    Builtin::Plus,
+                    Box::new(Operation::Identity(Factor::Number(3.0)))
+                ))
+            )))
+        );
+    }
+
+    #[test]
+    fn shapes() {
+        let expression = "z: (1 * (2.0 + 5 / (4 - 2)))\n square x\nsquare x+(13.2) 9.2\n circle x+23.9\n circle z\n circle (12.93*(2+(9-7.6/129.92)))\n circle";
+        let (rest, _ast) = parser(expression).unwrap();
+
+        assert_eq!(rest, "");
     }
 }
