@@ -7,9 +7,9 @@ use nom::branch::alt;
 use nom::character::complete::{alpha1, char, multispace0, one_of, space0};
 use nom::combinator::map;
 use nom::error::VerboseError as Error;
-use nom::multi::{fold_many0, many0, many_till};
+use nom::multi::many0;
 use nom::number::complete::float;
-use nom::sequence::{pair, preceded, terminated, tuple};
+use nom::sequence::{preceded, terminated, tuple};
 use nom::IResult;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -40,7 +40,6 @@ pub enum Operation {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Expression {
-    Constant(Atom),
     Declaration((String, Operation)),
 }
 
@@ -97,11 +96,11 @@ pub fn has_higher_precedence(first: &Builtin, second: &Builtin) -> bool {
 }
 
 pub fn expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
-    let (input, atoms) = many0(atom)(input)?;
+    let (_, atoms) = many0(atom)(input)?;
     let mut factors: Vec<Operation> = vec![];
     let mut operators: Vec<Builtin> = vec![];
 
-    for (index, atom) in atoms.clone().iter().enumerate() {
+    for atom in atoms.clone().iter() {
         match atom {
             Atom::Factor(factor) => {
                 factors.push(Operation::Identity(factor.clone()));
@@ -135,12 +134,8 @@ pub fn expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
         )))
     }
 
-    // TODO: Apply the shunting yard algorithm here
     // https://stackoverflow.com/questions/28256/equation-expression-parser-with-precedence#47717
-    dbg!(factors.clone());
-    dbg!(operators.clone());
-    // TODO: Remove this
-    Ok(("", Operation::Identity(Factor::Number(1.0))))
+    Ok(("", factors.first().unwrap().clone()))
 }
 
 pub fn parser(input: &str) -> IResult<&str, Vec<Expression>, Error<&str>> {
@@ -158,68 +153,40 @@ pub fn parser(input: &str) -> IResult<&str, Vec<Expression>, Error<&str>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
-
-    // #[test]
-    // fn declare_variable() {
-    //     let mut variables: HashMap<String, f32> = HashMap::new();
-    //     let (_, commands) = parser("x: 2").unwrap();
-    //     for command in commands {
-    //         if let Command::DeclareVariable((name, value)) = command {
-    //             variables.insert(name, eval(value));
-    //         }
-    //     }
-    //     assert_eq!(variables.get("x"), Some(&2.0));
-    // }
-    // #[test]
-    // fn test_simple_expression() {
-    //     let expression = "x: 3\ny: 1\nz: y * 2.0\n";
-    //     let (rest, ast) = parser(expression).unwrap();
-    //     assert_eq!(
-    //         ast[0],
-    //         Command::DeclareVariable((
-    //             "x".to_string(),
-    //             vec![Operation::Identity(Value::Number(3.0))]
-    //         ))
-    //     );
-    //     assert_eq!(
-    //         ast[1],
-    //         Command::DeclareVariable((
-    //             "y".to_string(),
-    //             vec![Operation::Identity(Value::Number(1.0))]
-    //         ))
-    //     );
-    //     assert_eq!(
-    //         ast[2],
-    //         Command::DeclareVariable((
-    //             "z".to_string(),
-    //             vec![Operation::Mult((
-    //                 Value::Variable("y".to_string()),
-    //                 Value::Number(2.0)
-    //             ))]
-    //         ))
-    //     );
-    //     assert_eq!(rest, "");
-    // }
 
     #[test]
-    fn test_several_operations() {
+    fn declare_variable() {
+        let (rest, commands) = parser("x: 2").unwrap();
+        assert_eq!(
+            commands[0],
+            Expression::Declaration(("x".to_string(), Operation::Identity(Factor::Number(2.0))))
+        );
+        assert_eq!(rest, "");
+    }
+
+    #[test]
+    fn declare_variable_with_expression() {
         let expression = "z: y + 2.0 * x + 3\n";
         let (rest, ast) = parser(expression).unwrap();
-        // dbg!(ast.clone());
-        assert_eq!(false, true);
-        // assert_eq!(
-        //     ast[0],
-        //     Command::DeclareVariable((
-        //         "z".to_string(),
-        //         vec![Operation::Plus((
-        //             Factor::Variable("y".to_string()),
-        //             ::Operation(Box::new(Operation::Mult((
-        //                 Value::Number(2.0),
-        //                 Value::Variable("x".to_string())
-        //             ))))
-        //         ))]
-        //     ))
-        // );
+        assert_eq!(rest, "");
+        assert_eq!(
+            ast[0],
+            Expression::Declaration((
+                "z".to_string(),
+                Operation::Calculation((
+                    Box::new(Operation::Identity(Factor::Variable("y".to_string()))),
+                    Builtin::Plus,
+                    Box::new(Operation::Calculation((
+                        Box::new(Operation::Calculation((
+                            Box::new(Operation::Identity(Factor::Number(2.0))),
+                            Builtin::Mult,
+                            Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
+                        ))),
+                        Builtin::Plus,
+                        Box::new(Operation::Identity(Factor::Number(3.0))),
+                    )))
+                ))
+            ))
+        );
     }
 }
