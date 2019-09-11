@@ -9,7 +9,7 @@ use nom::combinator::map;
 use nom::error::VerboseError as Error;
 use nom::multi::many0;
 use nom::number::complete::float;
-use nom::sequence::{preceded, terminated, tuple};
+use nom::sequence::{delimited, preceded, terminated, tuple};
 use nom::IResult;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -24,6 +24,7 @@ pub enum Builtin {
 pub enum Factor {
     Variable(String),
     Number(f32),
+    Operation(Box<Operation>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -69,6 +70,13 @@ pub fn factor(input: &str) -> IResult<&str, Factor, Error<&str>> {
         tuple((
             space0,
             alt((
+                // delimited(
+                //     char('('),
+                //     map(expr, |operation: Operation| {
+                //         Factor::Operation(Box::new(operation))
+                //     }),
+                //     char(')'),
+                // ),
                 map(alpha1, |variable: &str| {
                     Factor::Variable(variable.to_string())
                 }),
@@ -165,6 +173,28 @@ mod tests {
     }
 
     #[test]
+    fn declare_variable_with_expression_only_sum() {
+        let expression = "z: y + 2.0 + x\n";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(
+            ast[0],
+            Expression::Declaration((
+                "z".to_string(),
+                Operation::Calculation((
+                    Box::new(Operation::Identity(Factor::Variable("y".to_string()))),
+                    Builtin::Plus,
+                    Box::new(Operation::Calculation((
+                        Box::new(Operation::Identity(Factor::Number(2.0))),
+                        Builtin::Plus,
+                        Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
+                    ))),
+                ))
+            ))
+        );
+    }
+
+    #[test]
     fn declare_variable_with_expression() {
         let expression = "z: y + 2.0 * x + 3\n";
         let (rest, ast) = parser(expression).unwrap();
@@ -188,5 +218,31 @@ mod tests {
                 ))
             ))
         );
+    }
+
+    #[test]
+    fn declare_variable_with_expression_and_parenthesis() {
+        let expression = "z: (y + 2.0) * x + 3\n";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(
+            ast[0],
+            Expression::Declaration((
+                "z".to_string(),
+                Operation::Calculation((
+                    Box::new(Operation::Calculation((
+                        Box::new(Operation::Calculation((
+                            Box::new(Operation::Identity(Factor::Variable("y".to_string()))),
+                            Builtin::Plus,
+                            Box::new(Operation::Identity(Factor::Number(2.0)))
+                        ))),
+                        Builtin::Mult,
+                        Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
+                    ))),
+                    Builtin::Plus,
+                    Box::new(Operation::Identity(Factor::Number(3.0))),
+                ))
+            ))
+        )
     }
 }
