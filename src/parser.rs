@@ -7,7 +7,7 @@ use nom::branch::alt;
 use nom::character::complete::{alpha1, char, multispace0, one_of, space0};
 use nom::combinator::map;
 use nom::error::VerboseError as Error;
-use nom::multi::{fold_many0, many0};
+use nom::multi::{fold_many0, many0, many_till};
 use nom::number::complete::float;
 use nom::sequence::{pair, preceded, terminated, tuple};
 use nom::IResult;
@@ -82,29 +82,54 @@ pub fn factor(input: &str) -> IResult<&str, Factor, Error<&str>> {
 }
 
 pub fn atom(input: &str) -> IResult<&str, Atom, Error<&str>> {
-    alt((map(factor, |f| Atom::Factor(f)), builtin))(input)
+    alt((builtin, map(factor, |f| Atom::Factor(f))))(input)
+}
+
+pub fn has_higher_precedence(first: &Builtin, second: &Builtin) -> bool {
+    match first {
+        Builtin::Mult | Builtin::Div => match second {
+            Builtin::Plus => true,
+            Builtin::Minus => true,
+            _ => false,
+        },
+        Builtin::Plus | Builtin::Minus => false,
+    }
 }
 
 pub fn expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
-    let (first_input, first_factor) = factor(input)?;
-    let first_operation = Operation::Identity(first_factor);
-    let (input, operation) = fold_many0(
-        pair(builtin, factor),
-        first_operation.clone(),
-        |acc, (op, next_factor)| match op {
-            Atom::Builtin(operator) => Operation::Calculation((
-                Box::new(acc),
-                operator,
-                Box::new(Operation::Identity(next_factor)),
-            )),
-            _ => unreachable!(),
-        },
-    )(first_input)?;
-    if first_input == "" {
-        Ok((first_input, first_operation))
-    } else {
-        Ok((input, operation))
+    let (input, atoms) = many0(atom)(input)?;
+    let mut factors: Vec<Operation> = vec![];
+    let mut operators: Vec<Builtin> = vec![];
+
+    for (index, atom) in atoms.clone().iter().enumerate() {
+        match atom {
+            Atom::Factor(factor) => {
+                factors.push(Operation::Identity(factor.clone()));
+            }
+            Atom::Builtin(operator) => {
+                if operators.len() > 0 {
+                    if has_higher_precedence(&operators.last().unwrap(), &operator) {
+                        let op = operators.pop().unwrap();
+                        let second = factors.pop().unwrap();
+                        let first = factors.pop().unwrap();
+                        factors.push(Operation::Calculation((
+                            Box::new(first),
+                            op,
+                            Box::new(second),
+                        )))
+                    }
+                }
+                operators.push(operator.clone());
+            }
+        }
     }
+
+    // TODO: Apply the shunting yard algorithm here
+    // https://stackoverflow.com/questions/28256/equation-expression-parser-with-precedence#47717
+    dbg!(factors.clone());
+    dbg!(operators.clone());
+    // TODO: Remove this
+    Ok(("", Operation::Identity(Factor::Number(1.0))))
 }
 
 pub fn parser(input: &str) -> IResult<&str, Vec<Expression>, Error<&str>> {
@@ -168,17 +193,17 @@ mod tests {
 
     #[test]
     fn test_several_operations() {
-        let expression = "z: y + 2.0 * x\n";
+        let expression = "z: y + 2.0 * x + 3\n";
         let (rest, ast) = parser(expression).unwrap();
-        dbg!(ast.clone());
+        // dbg!(ast.clone());
         assert_eq!(false, true);
         // assert_eq!(
         //     ast[0],
         //     Command::DeclareVariable((
         //         "z".to_string(),
         //         vec![Operation::Plus((
-        //             Value::Variable("y".to_string()),
-        //             Value::Operation(Box::new(Operation::Mult((
+        //             Factor::Variable("y".to_string()),
+        //             ::Operation(Box::new(Operation::Mult((
         //                 Value::Number(2.0),
         //                 Value::Variable("x".to_string())
         //             ))))
