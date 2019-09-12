@@ -1,12 +1,11 @@
 mod parser;
-use parser::{parser, Builtin, Expression, Factor, Operation};
+use parser::{parser, Builtin, Expression, Factor, Node, Operation};
 use std::collections::HashMap;
 
 fn get_value(factor: Factor, variables: &HashMap<String, f32>) -> f32 {
     match factor {
         Factor::Number(number) => number,
         Factor::Variable(variable_name) => *variables.get(&variable_name).unwrap(),
-        _ => unimplemented!(),
     }
 }
 
@@ -46,15 +45,17 @@ fn declare_variable(
 
 fn main() {
     // Tiè
-    let content = "x: 2\ny: x\nx: 1\nz: ((x + (2 + 3)) * y) / 2";
+    let content = "x: 2\ny: x\nx: 1\nz: ((x + (2 + 3)) * y) / 2\nsquare y z";
     let (_, ast) = parser(content).unwrap();
     let mut variables: HashMap<String, f32> = HashMap::new();
+    let mut nodes: Vec<Node> = vec![];
     for expression in ast {
         match expression {
             Expression::Declaration(declaration) => {
                 let (name, value) = declare_variable(declaration, &variables);
                 variables.insert(name, value);
             }
+            Expression::Instantiation(node) => nodes.push(node),
         }
     }
     assert_eq!(*variables.get("x").unwrap(), 1.0);
