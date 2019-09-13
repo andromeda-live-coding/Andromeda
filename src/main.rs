@@ -11,10 +11,28 @@ fn get_value(factor: Factor, variables: &HashMap<String, f32>) -> f32 {
 }
 
 // need something here
-fn eval_calculation(expr: Box<Operation>, variables: &HashMap<String, f32>) -> f32 {
-    match *expr {
+fn eval_calc(
+    f: Box<Operation>,
+    op: Builtin,
+    expr: Box<Operation>,
+    variables: &HashMap<String, f32>,
+) -> f32 {
+    let first = match *f {
         Operation::Identity(value) => get_value(value, variables),
-        Operation::Calculation((first, op, second)) => eval_calculation(second, variables),
+        Operation::Calculation(_) => unimplemented!(),
+    };
+
+    let b = match *expr {
+        Operation::Identity(value) => get_value(value, variables),
+
+        //final
+        Operation::Calculation((first, op, second)) => unimplemented!(),
+    };
+    match op {
+        Builtin::Plus => first + b,
+        Builtin::Minus => first - b,
+        Builtin::Div => unimplemented!(),
+        Builtin::Mult => unimplemented!(),
     }
 }
 
@@ -35,7 +53,9 @@ fn declare_variable(
             let second = match *second {
                 Operation::Identity(second) => get_value(second, variables), // OK
                 // TODO: This should be implemented
-                Operation::Calculation((first2, _op2, second2)) => unimplemented!(),
+                Operation::Calculation((first2, op2, second2)) => {
+                    eval_calc(first2, op2, second2, variables)
+                }
             };
             ///////////////////////////////////////////////////////////////////////////////////////
             match op {
@@ -49,7 +69,7 @@ fn declare_variable(
 }
 
 fn main() {
-    //let content = "x: 2\ny: x\nz: x + 2";
+    let content = "x: 2\ny: x\nz: x * 12";
     // TODO: Try with this content
     let content2 = "x: 2\ny: x\nz: x + 2 + 3";
     //let content3 = "x: 2\ny: x\nz: x + y + 1 +1 ";
