@@ -11,7 +11,7 @@ fn get_value(factor: Factor, variables: &HashMap<String, f32>) -> f32 {
 }
 
 // need something here
-fn eval_calc(
+fn eval(
     f: Box<Operation>,
     op: Builtin,
     expr: Box<Operation>,
@@ -19,20 +19,20 @@ fn eval_calc(
 ) -> f32 {
     let first = match *f {
         Operation::Identity(value) => get_value(value, variables),
-        Operation::Calculation(_) => unimplemented!(),
+        //final
+        Operation::Calculation((first, op, second)) => eval(first, op, second, variables),
     };
 
     let b = match *expr {
         Operation::Identity(value) => get_value(value, variables),
-
         //final
-        Operation::Calculation((first, op, second)) => unimplemented!(),
+        Operation::Calculation((first, op, second)) => eval(first, op, second, variables),
     };
     match op {
         Builtin::Plus => first + b,
         Builtin::Minus => first - b,
-        Builtin::Div => unimplemented!(),
-        Builtin::Mult => unimplemented!(),
+        Builtin::Div => first / b,
+        Builtin::Mult => first * b,
     }
 }
 
@@ -54,7 +54,7 @@ fn declare_variable(
                 Operation::Identity(second) => get_value(second, variables), // OK
                 // TODO: This should be implemented
                 Operation::Calculation((first2, op2, second2)) => {
-                    eval_calc(first2, op2, second2, variables)
+                    eval(first2, op2, second2, variables)
                 }
             };
             ///////////////////////////////////////////////////////////////////////////////////////
@@ -69,11 +69,11 @@ fn declare_variable(
 }
 
 fn main() {
-    let content = "x: 2\ny: x\nz: x * 12";
+    let content = "x: 2\ny: x\nz: x + 2 + 2 * 2 - 19 - ( 19 * 12.6) * 0.1";
     // TODO: Try with this content
     let content2 = "x: 2\ny: x\nz: x + 2 + 3";
     //let content3 = "x: 2\ny: x\nz: x + y + 1 +1 ";
-    let (_, ast) = parser(content2).unwrap();
+    let (_, ast) = parser(content).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
     for expression in ast {
