@@ -47,7 +47,9 @@ fn declare_variable(
             let first = match *first {
                 Operation::Identity(first) => get_value(first, variables),
                 // TODO: This should be implemented // MAYBE NOT TO EVALUATE EXPRESSIONS (IT DO OTHER THINGS)
-                Operation::Calculation((_first2, _op2, _second2)) => unimplemented!(), // OK
+                Operation::Calculation((_first2, _op2, _second2)) => {
+                    eval(_first2, _op2, _second2, variables)
+                }
             };
             ///////////////////////////////////////////////////////////////////////////////////////
             let second = match *second {
@@ -69,7 +71,7 @@ fn declare_variable(
 }
 
 fn main() {
-    let content = "x: 2\ny: x\nz: x + 2 + 2 * 2 - 19 - ( 19 * 12.6) * 0.1";
+    let content = "x: 2\ny: x\nz: (x + y + 2 * (9-2) + 12 - (9*2+ (2) )) * x ";
     // TODO: Try with this content
     let content2 = "x: 2\ny: x\nz: x + 2 + 3";
     //let content3 = "x: 2\ny: x\nz: x + y + 1 +1 ";
