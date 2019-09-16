@@ -74,7 +74,7 @@ pub enum Node {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Expression {
+pub enum Command {
     Declaration((String, Operation)),
     Instantiation(Node),
 }
@@ -118,9 +118,6 @@ pub fn factor(input: &str) -> IResult<&str, Operation, Error<&str>> {
     )(input)
 }
 
-// We read an initial factor and for each time we find
-// a * or / operator followed by another factor, we do
-// the math by folding everything
 fn term(i: &str) -> IResult<&str, Operation, Error<&str>> {
     let (i, init) = factor(i)?;
 
@@ -153,26 +150,24 @@ pub fn variable_name(input: &str) -> IResult<&str, String, Error<&str>> {
     map(alpha1, |x: &str| x.to_string())(input)
 }
 
-pub fn assignment(input: &str) -> IResult<&str, Expression, Error<&str>> {
+pub fn assignment(input: &str) -> IResult<&str, Command, Error<&str>> {
     map(
         tuple((variable_name, space0, char(':'), space0, expr)),
-        |(variable_name, _, _, _, value)| Expression::Declaration((variable_name, value)),
+        |(variable_name, _, _, _, value)| Command::Declaration((variable_name, value)),
     )(input)
 }
 
-pub fn node_initialization(input: &str) -> IResult<&str, Expression, Error<&str>> {
+pub fn node_initialization(input: &str) -> IResult<&str, Command, Error<&str>> {
     map(alt((tag("square"), tag("box"))), |node| match node {
-        "square" => Expression::Instantiation(Node::Square((1.0, 1.0))),
-        "circle" => Expression::Instantiation(Node::Circle(1.0)),
+        "square" => Command::Instantiation(Node::Square((1.0, 1.0))),
+        "circle" => Command::Instantiation(Node::Circle(1.0)),
         _ => unreachable!(),
     })(input)
 }
 
-pub fn parser(input: &str) -> IResult<&str, Vec<Expression>, Error<&str>> {
+pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {
     many0(terminated(
         preceded(multispace0, alt((assignment, node_initialization))),
         multispace0,
     ))(input)
 }
-
-// test branch

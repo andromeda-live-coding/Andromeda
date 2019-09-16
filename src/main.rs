@@ -1,5 +1,5 @@
 mod parser;
-use parser::{parser, Builtin, Expression, Factor, Node, Operation};
+use parser::*;
 use std::collections::HashMap;
 
 fn get_value(factor: Factor, variables: &HashMap<String, f32>) -> f32 {
@@ -9,19 +9,14 @@ fn get_value(factor: Factor, variables: &HashMap<String, f32>) -> f32 {
     }
 }
 
-fn calculate(
-    first: Operation,
-    op: Builtin,
-    second: Operation,
-    variables: &HashMap<String, f32>,
-) -> f32 {
+fn eval(first: Operation, op: Builtin, second: Operation, variables: &HashMap<String, f32>) -> f32 {
     let first = match first {
         Operation::Identity(first) => get_value(first, variables),
-        Operation::Calculation((first, op, second)) => calculate(*first, op, *second, variables),
+        Operation::Calculation((first, op, second)) => eval(*first, op, *second, variables),
     };
     let second = match second {
         Operation::Identity(second) => get_value(second, variables),
-        Operation::Calculation((first, op, second)) => calculate(*first, op, *second, variables),
+        Operation::Calculation((first, op, second)) => eval(*first, op, *second, variables),
     };
     match op {
         Builtin::Plus => first + second,
@@ -37,25 +32,22 @@ fn declare_variable(
 ) -> (String, f32) {
     match value {
         Operation::Identity(factor) => (name, get_value(factor, variables)),
-        Operation::Calculation((first, op, second)) => {
-            (name, calculate(*first, op, *second, variables))
-        }
+        Operation::Calculation((first, op, second)) => (name, eval(*first, op, *second, variables)),
     }
 }
 
 fn main() {
-    // Tiè
     let content = "x: 2\ny: x\nx: 1\nz: ((x + (2 + 3)) * y) / 2\nsquare y z";
     let (_, ast) = parser(content).unwrap();
     let mut variables: HashMap<String, f32> = HashMap::new();
     let mut nodes: Vec<Node> = vec![];
     for expression in ast {
         match expression {
-            Expression::Declaration(declaration) => {
+            Command::Declaration(declaration) => {
                 let (name, value) = declare_variable(declaration, &variables);
                 variables.insert(name, value);
             }
-            Expression::Instantiation(node) => nodes.push(node),
+            Command::Instantiation(node) => nodes.push(node),
         }
     }
     assert_eq!(*variables.get("x").unwrap(), 1.0);
