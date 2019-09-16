@@ -75,7 +75,7 @@ impl Sub for Operation {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Expression {
+pub enum Command {
     Declaration((String, Operation)),
 }
 
@@ -186,12 +186,12 @@ pub fn expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
     Ok((input, factors.first().unwrap().clone()))
 }
 
-pub fn parser(input: &str) -> IResult<&str, Vec<Expression>, Error<&str>> {
+pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {
     many0(terminated(
         preceded(
             multispace0,
             map(assignment, |(name, operation): (String, Operation)| {
-                Expression::Declaration((name, operation))
+                Command::Declaration((name, operation))
             }),
         ),
         multispace0,
@@ -207,7 +207,7 @@ mod tests {
         let (rest, commands) = parser("x: 2").unwrap();
         assert_eq!(
             commands[0],
-            Expression::Declaration(("x".to_string(), Operation::Identity(Factor::Number(2.0))))
+            Command::Declaration(("x".to_string(), Operation::Identity(Factor::Number(2.0))))
         );
         assert_eq!(rest, "");
     }
@@ -219,7 +219,7 @@ mod tests {
         assert_eq!(rest, "");
         assert_eq!(
             ast[0],
-            Expression::Declaration((
+            Command::Declaration((
                 "z".to_string(),
                 Operation::Identity(Factor::Variable("y".to_string()))
                     + Operation::Identity(Factor::Number(2.0))
@@ -234,7 +234,7 @@ mod tests {
         assert_eq!(rest, "");
         assert_eq!(
             ast[0],
-            Expression::Declaration((
+            Command::Declaration((
                 "z".to_string(),
                 Operation::Identity(Factor::Variable("y".to_string()))
                     + (Operation::Identity(Factor::Number(2.0))
@@ -250,7 +250,7 @@ mod tests {
         assert_eq!(rest, "");
         assert_eq!(
             ast[0],
-            Expression::Declaration((
+            Command::Declaration((
                 "z".to_string(),
                 Operation::Identity(Factor::Variable("y".to_string()))
                     + ((Operation::Identity(Factor::Number(2.0))
@@ -268,7 +268,7 @@ mod tests {
         assert_eq!(rest, "");
         assert_eq!(
             ast[0],
-            Expression::Declaration((
+            Command::Declaration((
                 "z".to_string(),
                 (Operation::Identity(Factor::Variable("y".to_string()))
                     + Operation::Identity(Factor::Number(2.0)))
