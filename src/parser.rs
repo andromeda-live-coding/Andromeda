@@ -1,8 +1,3 @@
-// *****parser*****
-// it recognizes *instructions* like "box x y"
-// i need to convert variables in f32, if the variables were previously declared
-// **IMPORTANT** MVC has just to do DrawShapeWf32(shape, val1, val2) where val1 and val2 are f32!
-// i need an HashMap inside the parser because we need to keep track of all variables in the context.
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, multispace0, one_of, space0};
@@ -69,8 +64,8 @@ impl Sub for Operation {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Node {
-    Square((f32, f32)),
-    Circle(f32),
+    Square((Operation, Operation)),
+    Circle(Operation),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -157,17 +152,19 @@ pub fn assignment(input: &str) -> IResult<&str, Command, Error<&str>> {
     )(input)
 }
 
-pub fn node_initialization(input: &str) -> IResult<&str, Command, Error<&str>> {
-    map(alt((tag("square"), tag("box"))), |node| match node {
-        "square" => Command::Instantiation(Node::Square((1.0, 1.0))),
-        "circle" => Command::Instantiation(Node::Circle(1.0)),
-        _ => unreachable!(),
-    })(input)
+pub fn declare_box(input: &str) -> IResult<&str, Command, Error<&str>> {
+    map(
+        tuple((tag("square"), space0, expr, space0, expr)),
+        |(shape, _, val1, _, val2): (&str, _, Operation, _, Operation)| match shape {
+            "square" => Command::Instantiation(Node::Square((val1, val2))),
+            _ => unreachable!(),
+        },
+    )(input)
 }
 
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {
     many0(terminated(
-        preceded(multispace0, alt((assignment, node_initialization))),
+        preceded(multispace0, alt((assignment, declare_box))),
         multispace0,
     ))(input)
 }
