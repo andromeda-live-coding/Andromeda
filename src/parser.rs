@@ -168,6 +168,19 @@ pub fn draw_shape(input: &str) -> IResult<&str, Command, Error<&str>> {
                 _ => unreachable!(),
             },
         ),
+        map(
+            alt((tag("square"), tag("circle"))),
+            |shape: &str| match shape {
+                "square" => Command::Instantiation(Node::Square((
+                    Operation::Identity(Factor::Number(1.0)),
+                    Operation::Identity(Factor::Number(1.0)),
+                ))),
+                "circle" => {
+                    Command::Instantiation(Node::Circle(Operation::Identity(Factor::Number(1.0))))
+                }
+                _ => unreachable!(),
+            },
+        ),
     ))(input)
 }
 
@@ -269,7 +282,7 @@ mod tests {
 
     #[test]
     fn shape() {
-        let expression = "z: (1 * (2.0 + 5 / (4 - 2)))\n square x\nsquare x+(13.2) 9.2\n circle x ";
+        let expression = "z: (1 * (2.0 + 5 / (4 - 2)))\n square x\nsquare x+(13.2) 9.2\n circle x+23.9\n circle z\n circle (12.93*(2+(9-7.6/129.92)))\n circle";
         let (rest, _ast) = parser(expression).unwrap();
 
         assert_eq!(rest, "");
