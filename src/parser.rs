@@ -3,7 +3,7 @@ use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, multispace0, one_of, space0};
 use nom::combinator::map;
 use nom::error::VerboseError as Error;
-use nom::multi::{fold_many0, many0};
+use nom::multi::{fold_many0, many0, many_m_n};
 use nom::number::complete::float;
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
 use nom::IResult;
@@ -152,36 +152,33 @@ pub fn assignment(input: &str) -> IResult<&str, Command, Error<&str>> {
     )(input)
 }
 
+pub fn square(input: &str) -> IResult<&str, Node, Error<&str>> {
+    map(
+        pair(tag("square"), many_m_n(0, 2, expr)),
+        |(_, params)| match (params.get(0), params.get(1)) {
+            (Some(width), Some(height)) => Node::Square((width.clone(), height.clone())),
+            (Some(size), None) => Node::Square((size.clone(), size.clone())),
+            (None, None) => Node::Square((
+                Operation::Identity(Factor::Number(1.0)),
+                Operation::Identity(Factor::Number(1.0)),
+            )),
+            _ => unreachable!(),
+        },
+    )(input)
+}
+
+pub fn circle(input: &str) -> IResult<&str, Node, Error<&str>> {
+    map(
+        pair(tag("circle"), many_m_n(0, 1, expr)),
+        |(_, params)| match params.first() {
+            Some(radius) => Node::Circle(radius.clone()),
+            None => Node::Circle(Operation::Identity(Factor::Number(1.0))),
+        },
+    )(input)
+}
+
 pub fn draw_shape(input: &str) -> IResult<&str, Command, Error<&str>> {
-    alt((
-        map(
-            tuple((tag("square"), space0, expr, space0, expr)),
-            |(_, _, val1, _, val2): (&str, _, Operation, _, Operation)| {
-                Command::Instantiation(Node::Square((val1, val2)))
-            },
-        ),
-        map(
-            tuple((alt((tag("square"), tag("circle"))), space0, expr)),
-            |(shape, _, val): (&str, _, Operation)| match shape {
-                "square" => Command::Instantiation(Node::Square((val.clone(), val.clone()))),
-                "circle" => Command::Instantiation(Node::Circle(val)),
-                _ => unreachable!(),
-            },
-        ),
-        map(
-            alt((tag("square"), tag("circle"))),
-            |shape: &str| match shape {
-                "square" => Command::Instantiation(Node::Square((
-                    Operation::Identity(Factor::Number(1.0)),
-                    Operation::Identity(Factor::Number(1.0)),
-                ))),
-                "circle" => {
-                    Command::Instantiation(Node::Circle(Operation::Identity(Factor::Number(1.0))))
-                }
-                _ => unreachable!(),
-            },
-        ),
-    ))(input)
+    map(alt((circle, square)), Command::Instantiation)(input)
 }
 
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {
@@ -281,7 +278,89 @@ mod tests {
     }
 
     #[test]
-    fn shape() {
+    fn square_with_no_params() {
+        let expression = "square";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(
+            ast[0],
+            Command::Instantiation(Node::Square((
+                Operation::Identity(Factor::Number(1.0)),
+                Operation::Identity(Factor::Number(1.0))
+            )))
+        );
+    }
+
+    #[test]
+    fn circle_with_no_params() {
+        let expression = "circle";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(
+            ast[0],
+            Command::Instantiation(Node::Circle(Operation::Identity(Factor::Number(1.0))))
+        );
+    }
+
+    #[test]
+    fn square_with_one_params() {
+        let expression = "square 17.22";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(
+            ast[0],
+            Command::Instantiation(Node::Square((
+                Operation::Identity(Factor::Number(17.22)),
+                Operation::Identity(Factor::Number(17.22))
+            )))
+        );
+    }
+
+    #[test]
+    fn circle_with_one_params() {
+        let expression = "circle 29.93";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(
+            ast[0],
+            Command::Instantiation(Node::Circle(Operation::Identity(Factor::Number(29.93))))
+        );
+    }
+
+    #[test]
+    fn square_with_two_params() {
+        let expression = "square 17.22 22.17";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(
+            ast[0],
+            Command::Instantiation(Node::Square((
+                Operation::Identity(Factor::Number(17.22)),
+                Operation::Identity(Factor::Number(22.17))
+            )))
+        );
+    }
+
+    #[test]
+    fn declaration_and_instantiation() {
+        let expression = "x: 1\n square x x + 3";
+        let (rest, ast) = parser(expression).unwrap();
+        assert_eq!(rest, "");
+        assert_eq!(
+            ast[1],
+            Command::Instantiation(Node::Square((
+                Operation::Identity(Factor::Variable("x".to_string())),
+                Operation::Calculation((
+                    Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
+                    Builtin::Plus,
+                    Box::new(Operation::Identity(Factor::Number(3.0)))
+                ))
+            )))
+        );
+    }
+
+    #[test]
+    fn shapes() {
         let expression = "z: (1 * (2.0 + 5 / (4 - 2)))\n square x\nsquare x+(13.2) 9.2\n circle x+23.9\n circle z\n circle (12.93*(2+(9-7.6/129.92)))\n circle";
         let (rest, _ast) = parser(expression).unwrap();
 
