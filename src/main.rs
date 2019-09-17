@@ -37,8 +37,9 @@ fn declare_variable(
 }
 
 fn main() {
-    let content = "x: 2\ny: x\nx: 1\nz: ((x + (2 + 3)) * y) / 2\nsquare y z";
-    let (_, ast) = parser(content).unwrap();
+    let content = "x: 2\ny: x\nx: 1\nz: ((x + (2 + 3)) * y) / 2\nsquare z+12 x+(19.1*2)";
+    let (rest, ast) = parser(content).unwrap();
+    dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
     let mut nodes: Vec<Node> = vec![];
     for expression in ast {
@@ -53,4 +54,5 @@ fn main() {
     assert_eq!(*variables.get("x").unwrap(), 1.0);
     assert_eq!(*variables.get("y").unwrap(), 2.0);
     assert_eq!(*variables.get("z").unwrap(), 6.0);
+    assert_eq!(rest, "");
 }

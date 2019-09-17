@@ -152,19 +152,28 @@ pub fn assignment(input: &str) -> IResult<&str, Command, Error<&str>> {
     )(input)
 }
 
-pub fn declare_box(input: &str) -> IResult<&str, Command, Error<&str>> {
-    map(
-        tuple((tag("square"), space0, expr, space0, expr)),
-        |(shape, _, val1, _, val2): (&str, _, Operation, _, Operation)| match shape {
-            "square" => Command::Instantiation(Node::Square((val1, val2))),
-            _ => unreachable!(),
-        },
-    )(input)
+pub fn draw_shape(input: &str) -> IResult<&str, Command, Error<&str>> {
+    alt((
+        map(
+            tuple((tag("square"), space0, expr, space0, expr)),
+            |(_, _, val1, _, val2): (&str, _, Operation, _, Operation)| {
+                Command::Instantiation(Node::Square((val1, val2)))
+            },
+        ),
+        map(
+            tuple((alt((tag("square"), tag("circle"))), space0, expr)),
+            |(shape, _, val): (&str, _, Operation)| match shape {
+                "square" => Command::Instantiation(Node::Square((val.clone(), val.clone()))),
+                "circle" => Command::Instantiation(Node::Circle(val)),
+                _ => unreachable!(),
+            },
+        ),
+    ))(input)
 }
 
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {
     many0(terminated(
-        preceded(multispace0, alt((assignment, declare_box))),
+        preceded(multispace0, alt((draw_shape, assignment))),
         multispace0,
     ))(input)
 }
