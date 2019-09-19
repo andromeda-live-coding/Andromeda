@@ -16,12 +16,17 @@ pub enum Builtin {
     Minus,
     Mult,
     Div,
+    Greater,
+    GreaterOrEqual,
+    LesserOrEqual,
+    Equal,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Factor {
     Variable(String),
     Number(f32),
+    Boolean(bool),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -72,6 +77,8 @@ pub enum Node {
 pub enum Command {
     Declaration((String, Operation)),
     Instantiation(Node),
+    CommandIf((Operation, Builtin, Operation)),
+    ListOfCommands(Vec<Command>),
 }
 
 pub fn mult(input: &str) -> IResult<&str, Builtin, Error<&str>> {
@@ -181,9 +188,21 @@ pub fn draw_shape(input: &str) -> IResult<&str, Command, Error<&str>> {
     map(alt((circle, square)), Command::Instantiation)(input)
 }
 
+pub fn condition(input: &str) -> IResult<&str, Command, Error<&str>> {
+    map(tuple((expr, one_of("=<>"), expr)), |(a, _, c)| {
+        Command::CommandIf((a, Builtin::Plus, c))
+    })(input)
+}
+pub fn command_if(_input: &str) -> IResult<&str, Command, Error<&str>> {
+    unimplemented!();
+    //map(
+    //tuple((tag("if"), space0, left, space0, Builtin, space0, right, space0, true_block, space0, false_block, tag("end_if"))), |_, _, left_side, _, op, _, right_side, _|
+    //)(input)
+}
+
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {
     many0(terminated(
-        preceded(multispace0, alt((draw_shape, assignment))),
+        preceded(multispace0, alt((condition, draw_shape, assignment))),
         multispace0,
     ))(input)
 }

@@ -6,6 +6,7 @@ fn get_value(factor: Factor, variables: &HashMap<String, f32>) -> f32 {
     match factor {
         Factor::Number(number) => number,
         Factor::Variable(variable_name) => *variables.get(&variable_name).unwrap(),
+        _ => unimplemented!(),
     }
 }
 
@@ -23,6 +24,7 @@ fn eval(first: Operation, op: Builtin, second: Operation, variables: &HashMap<St
         Builtin::Minus => first - second,
         Builtin::Div => first / second,
         Builtin::Mult => first * second,
+        _ => unreachable!(),
     }
 }
 
@@ -38,7 +40,7 @@ fn declare_variable(
 
 fn main() {
     let content =
-        "x: 2\ny: x\nx: 1\nz: ((x + (2 + 3)) * y) / 2\nsquare z+x (19.1*2)\n square\n circle\n";
+        "x: 2\ny: x\nx: 1\nz: ((x + (2 + 3)) * y) / 2\nsquare z+x (19.1*2)\n square\n circle\n12.6 = x";
     let (rest, ast) = parser(content).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
@@ -50,6 +52,8 @@ fn main() {
                 variables.insert(name, value);
             }
             Command::Instantiation(node) => nodes.push(node),
+            Command::CommandIf((_, _, _)) => println!("bufu"),
+            _ => unimplemented!(),
         }
     }
     assert_eq!(*variables.get("x").unwrap(), 1.0);
