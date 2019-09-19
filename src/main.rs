@@ -28,6 +28,61 @@ fn eval(first: Operation, op: Builtin, second: Operation, variables: &HashMap<St
     }
 }
 
+fn eval_if(
+    first: Operation,
+    op: Builtin,
+    second: Operation,
+    variables: &HashMap<String, f32>,
+) -> bool {
+    let first = match first {
+        Operation::Identity(first) => get_value(first, variables),
+        Operation::Calculation((first, op, second)) => eval(*first, op, *second, variables),
+    };
+    let second = match second {
+        Operation::Identity(second) => get_value(second, variables),
+        Operation::Calculation((first, op, second)) => eval(*first, op, *second, variables),
+    };
+
+    match op {
+        Builtin::Equal => {
+            if first == second {
+                true
+            } else {
+                false
+            }
+        }
+        Builtin::Lesser => {
+            if first < second {
+                true
+            } else {
+                false
+            }
+        }
+        Builtin::Greater => {
+            if first > second {
+                true
+            } else {
+                false
+            }
+        }
+        Builtin::LesserOrEqual => {
+            if first <= second {
+                true
+            } else {
+                false
+            }
+        }
+        Builtin::GreaterOrEqual => {
+            if first >= second {
+                true
+            } else {
+                false
+            }
+        }
+        _ => unimplemented!(),
+    }
+}
+
 fn declare_variable(
     (name, value): (String, Operation),
     variables: &HashMap<String, f32>,
@@ -40,7 +95,7 @@ fn declare_variable(
 
 fn main() {
     let content =
-        "x: 2\ny: x\nx: 1\nz: ((x + (2 + 3)) * y) / 2\nsquare z+x (19.1*2)\n square\n circle\n12.6 = x";
+        "x: 2\ny: x\nx: 1\nz: ((x + (2 + 3)) * y) / 2\nsquare z+x (19.1*2)\n square\n circle\n12.6 = x+ 19.91\n 7 > 9\n 9>7";
     let (rest, ast) = parser(content).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
@@ -52,7 +107,13 @@ fn main() {
                 variables.insert(name, value);
             }
             Command::Instantiation(node) => nodes.push(node),
-            Command::CommandIf((_, _, _)) => println!("bufu"),
+            Command::CommandIf((x, y, z)) => {
+                if eval_if(x, y, z, &variables) {
+                    println!("true")
+                } else {
+                    println!("false")
+                }
+            }
             _ => unimplemented!(),
         }
     }
