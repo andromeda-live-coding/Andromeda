@@ -98,9 +98,21 @@ fn declare_variable(
 }
 
 fn main() {
-    let content =
-        "x: 2\ny: x\nx: 1\nz: ((x + (2 + 3)) * y) / 2\nsquare z+x (19.1*2)\n square\n circle\nif 12.6 = x+ 19.91\n square  \n else  circle  \n end if";
-    let content2 = "x: 2\n if 2+x = 5      circle   \n   else     circle  \n   end if  ";
+    let content = "x: 2\n
+        y: x\n
+        x: 1\n
+        z: ((x + (2 + 3)) * y) / 2\n
+        square z+x (19.1*2)\n
+        square\n 
+        circle\n
+        if 12.6 = x+ 19.91\n
+         square  19.2\n
+          else  
+          circle  17.1 
+          end if";
+    // not working if we don't put \n after each Operation::Instanstiation inside the if command.. try content3 to see what happens..
+    let content2 = "circle      \n x: 2\n if 2+x = 5\n square \n else circle \n  end if";
+    let content3 = "x: 3\n if 9.71 = 12.9 circle else square end if";
     let (rest, ast) = parser(content).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
@@ -119,7 +131,6 @@ fn main() {
                     println!("false")
                 }
             }
-            _ => unimplemented!(),
         }
     }
     //assert_eq!(*variables.get("x").unwrap(), 1.0);

@@ -189,7 +189,9 @@ pub fn circle(input: &str) -> IResult<&str, Node, Error<&str>> {
 }
 
 pub fn draw_shape(input: &str) -> IResult<&str, Command, Error<&str>> {
-    map(alt((circle, square)), Command::Instantiation)(input)
+    map(tuple((alt((circle, square)), multispace0)), |(v, _)| {
+        Command::Instantiation(v)
+    })(input)
 }
 
 // it should map an operation // operation and operation // operation or operation
@@ -198,7 +200,6 @@ pub fn draw_shape(input: &str) -> IResult<&str, Command, Error<&str>> {
 pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
     map(
         tuple((
-            multispace0,
             condition,
             multispace0,
             many0(draw_shape),
@@ -208,9 +209,8 @@ pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
             many0(draw_shape),
             multispace0,
             tag("end if"),
-            multispace0,
         )),
-        |(_, pred, _, true_branch, _, _, _, false_branch, _, _, _)| {
+        |(pred, _, true_branch, _, _, _, false_branch, _, _)| {
             Command::CommandIf((pred, true_branch, false_branch))
         },
     )(input)
