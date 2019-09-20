@@ -21,8 +21,11 @@ pub enum Builtin {
     GreaterOrEqual,
     LesserOrEqual,
     Equal,
+    And,
+    Or,
 }
 
+// Factor can be a boolean.. true or false
 #[derive(Debug, PartialEq, Clone)]
 pub enum Factor {
     Variable(String),
@@ -34,6 +37,7 @@ pub enum Factor {
 pub enum Operation {
     Identity(Factor),
     Calculation((Box<Operation>, Builtin, Box<Operation>)),
+    Condition((Box<Operation>, Builtin, Box<Operation>)),
 }
 
 impl Mul for Operation {
@@ -78,7 +82,7 @@ pub enum Node {
 pub enum Command {
     Declaration((String, Operation)),
     Instantiation(Node),
-    CommandIf((Operation, Builtin, Operation)),
+    CommandIf((Operation, Vec<Command>, Vec<Command>)),
 }
 
 pub fn mult(input: &str) -> IResult<&str, Builtin, Error<&str>> {
@@ -188,19 +192,51 @@ pub fn draw_shape(input: &str) -> IResult<&str, Command, Error<&str>> {
     map(alt((circle, square)), Command::Instantiation)(input)
 }
 
+// it should map an operation // operation and operation // operation or operation
+// we also need the commands to be interpreted for the true branch and for the false branch
+// it is also possible to have only the true branch
 pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
     map(
         tuple((
-            expr,
-            alt((tag("<="), tag(">="), tag("="), tag("<"), tag(">"))),
-            expr,
+            multispace0,
+            condition,
+            multispace0,
+            many0(draw_shape),
+            multispace0,
+            tag("else"),
+            multispace0,
+            many0(draw_shape),
+            multispace0,
+            tag("end if"),
+            multispace0,
         )),
-        |(a, b, c)| match b {
-            "<=" => Command::CommandIf((a, Builtin::LesserOrEqual, c)),
-            ">=" => Command::CommandIf((a, Builtin::GreaterOrEqual, c)),
-            "=" => Command::CommandIf((a, Builtin::Equal, c)),
-            "<" => Command::CommandIf((a, Builtin::Lesser, c)),
-            ">" => Command::CommandIf((a, Builtin::Greater, c)),
+        |(_, pred, _, true_branch, _, _, _, false_branch, _, _, _)| {
+            Command::CommandIf((pred, true_branch, false_branch))
+        },
+    )(input)
+}
+
+pub fn condition(input: &str) -> IResult<&str, Operation, Error<&str>> {
+    map(
+        tuple((
+            multispace0,
+            tag("if"),
+            multispace0,
+            expr,
+            multispace0,
+            alt((tag("<="), tag(">="), tag("="), tag("<"), tag(">"))),
+            multispace0,
+            expr,
+            multispace0,
+        )),
+        |(_, _, _, left, _, op, _, right, _)| match op {
+            "<=" => Operation::Condition((Box::new(left), Builtin::LesserOrEqual, Box::new(right))),
+            ">=" => {
+                Operation::Condition((Box::new(left), Builtin::GreaterOrEqual, Box::new(right)))
+            }
+            "=" => Operation::Condition((Box::new(left), Builtin::Equal, Box::new(right))),
+            "<" => Operation::Condition((Box::new(left), Builtin::Lesser, Box::new(right))),
+            ">" => Operation::Condition((Box::new(left), Builtin::Greater, Box::new(right))),
             _ => unimplemented!(),
         },
     )(input)

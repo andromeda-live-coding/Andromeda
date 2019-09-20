@@ -14,10 +14,12 @@ fn eval(first: Operation, op: Builtin, second: Operation, variables: &HashMap<St
     let first = match first {
         Operation::Identity(first) => get_value(first, variables),
         Operation::Calculation((first, op, second)) => eval(*first, op, *second, variables),
+        _ => unimplemented!(),
     };
     let second = match second {
         Operation::Identity(second) => get_value(second, variables),
         Operation::Calculation((first, op, second)) => eval(*first, op, *second, variables),
+        _ => unimplemented!(),
     };
     match op {
         Builtin::Plus => first + second,
@@ -29,12 +31,13 @@ fn eval(first: Operation, op: Builtin, second: Operation, variables: &HashMap<St
 }
 
 fn eval_if(
-    first: Operation,
-    op: Builtin,
-    second: Operation,
+    pred: Operation,
+    true_branch: Vec<Command>,
+    false_branch: Vec<Command>,
     variables: &HashMap<String, f32>,
 ) -> bool {
-    let first = match first {
+    true
+    /*let first = match first {
         Operation::Identity(first) => get_value(first, variables),
         Operation::Calculation((first, op, second)) => eval(*first, op, *second, variables),
     };
@@ -80,7 +83,7 @@ fn eval_if(
             }
         }
         _ => unimplemented!(),
-    }
+    }*/
 }
 
 fn declare_variable(
@@ -90,12 +93,14 @@ fn declare_variable(
     match value {
         Operation::Identity(factor) => (name, get_value(factor, variables)),
         Operation::Calculation((first, op, second)) => (name, eval(*first, op, *second, variables)),
+        _ => unimplemented!(),
     }
 }
 
 fn main() {
     let content =
-        "x: 2\ny: x\nx: 1\nz: ((x + (2 + 3)) * y) / 2\nsquare z+x (19.1*2)\n square\n circle\n12.6 = x+ 19.91\n 7 > 9\n 9>7";
+        "x: 2\ny: x\nx: 1\nz: ((x + (2 + 3)) * y) / 2\nsquare z+x (19.1*2)\n square\n circle\nif 12.6 = x+ 19.91\n square  \n else  circle  \n end if";
+    let content2 = "x: 2\n if 2+x = 5      circle   \n   else     circle  \n   end if  ";
     let (rest, ast) = parser(content).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
@@ -117,8 +122,9 @@ fn main() {
             _ => unimplemented!(),
         }
     }
-    assert_eq!(*variables.get("x").unwrap(), 1.0);
-    assert_eq!(*variables.get("y").unwrap(), 2.0);
-    assert_eq!(*variables.get("z").unwrap(), 6.0);
-    assert_eq!(rest, "");
+    //assert_eq!(*variables.get("x").unwrap(), 1.0);
+    //assert_eq!(*variables.get("y").unwrap(), 2.0);
+    //assert_eq!(*variables.get("z").unwrap(), 6.0);
+    //assert_eq!(rest, "");
+    dbg!(rest);
 }
