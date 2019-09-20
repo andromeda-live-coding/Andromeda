@@ -1,7 +1,7 @@
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, multispace0, one_of, space0};
-use nom::combinator::map;
+use nom::combinator::{map, opt};
 use nom::error::VerboseError as Error;
 use nom::multi::{fold_many0, many0, many_m_n};
 use nom::number::complete::float;
@@ -82,7 +82,8 @@ pub enum Node {
 pub enum Command {
     Declaration((String, Operation)),
     Instantiation(Node),
-    CommandIf((Operation, Vec<Command>, Vec<Command>)),
+    CommandIfElse((Operation, Vec<Command>, Vec<Command>)),
+    CommandIf((Operation, Vec<Command>)),
 }
 
 pub fn mult(input: &str) -> IResult<&str, Builtin, Error<&str>> {
@@ -203,15 +204,15 @@ pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
             condition,
             multispace0,
             many0(draw_shape),
-            multispace0,
-            tag("else"),
-            multispace0,
-            many0(draw_shape),
-            multispace0,
+            opt(map(tuple((
+                tag("else"), multispace0, many0(draw_shape))), |(_, _, commands)| commands)),
             tag("end if"),
         )),
-        |(pred, _, true_branch, _, _, _, false_branch, _, _)| {
-            Command::CommandIf((pred, true_branch, false_branch))
+        |(pred, _, true_branch, maybe_false_branch, _)| { if let Some(false_branch) = maybe_false_branch {
+                Command::CommandIfElse((pred, true_branch, false_branch))
+            } else {
+                Command::CommandIf((pred, true_branch))
+            }
         },
     )(input)
 }

@@ -30,12 +30,7 @@ fn eval(first: Operation, op: Builtin, second: Operation, variables: &HashMap<St
     }
 }
 
-fn eval_if(
-    pred: Operation,
-    true_branch: Vec<Command>,
-    false_branch: Vec<Command>,
-    variables: &HashMap<String, f32>,
-) -> bool {
+fn eval_if(pred: Operation, true_branch: Vec<Command>, variables: &HashMap<String, f32>) -> bool {
     true
     /*let first = match first {
         Operation::Identity(first) => get_value(first, variables),
@@ -111,9 +106,9 @@ fn main() {
           circle  17.1 
           end if";
     // not working if we don't put \n after each Operation::Instanstiation inside the if command.. try content3 to see what happens..
-    let content2 = "circle      \n x: 2\n if 2+x = 5\n square \n else circle \n  end if";
-    let content3 = "x: 3\n if 9.71 = 12.9 circle else square end if";
-    let (rest, ast) = parser(content).unwrap();
+    let content2 = "circle      \n x: 2\n if 2+x = 5\n square \n\n else circle\n  end if";
+    let content3 = "x: 3\n if 9.71 = 12.9 circle \n else \n square      end if";
+    let (rest, ast) = parser(content2).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
     let mut nodes: Vec<Node> = vec![];
@@ -124,18 +119,19 @@ fn main() {
                 variables.insert(name, value);
             }
             Command::Instantiation(node) => nodes.push(node),
-            Command::CommandIf((x, y, z)) => {
-                if eval_if(x, y, z, &variables) {
+            Command::CommandIf((x, y)) => {
+                if eval_if(x, y, &variables) {
                     println!("true")
                 } else {
                     println!("false")
                 }
             }
+            Command::CommandIfElse(_) => println!("if else found"),
         }
     }
     //assert_eq!(*variables.get("x").unwrap(), 1.0);
     //assert_eq!(*variables.get("y").unwrap(), 2.0);
     //assert_eq!(*variables.get("z").unwrap(), 6.0);
-    //assert_eq!(rest, "");
+    assert_eq!(rest, "");
     dbg!(rest);
 }
