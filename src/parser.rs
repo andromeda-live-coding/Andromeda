@@ -204,11 +204,14 @@ pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
             condition,
             multispace0,
             many0(draw_shape),
-            opt(map(tuple((
-                tag("else"), multispace0, many0(draw_shape))), |(_, _, commands)| commands)),
+            opt(map(
+                tuple((tag("else"), multispace0, many0(draw_shape))),
+                |(_, _, commands)| commands,
+            )),
             tag("end if"),
         )),
-        |(pred, _, true_branch, maybe_false_branch, _)| { if let Some(false_branch) = maybe_false_branch {
+        |(pred, _, true_branch, maybe_false_branch, _)| {
+            if let Some(false_branch) = maybe_false_branch {
                 Command::CommandIfElse((pred, true_branch, false_branch))
             } else {
                 Command::CommandIf((pred, true_branch))
