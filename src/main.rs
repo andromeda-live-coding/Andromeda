@@ -32,53 +32,6 @@ fn eval(first: Operation, op: Builtin, second: Operation, variables: &HashMap<St
 
 fn eval_if(pred: Operation, true_branch: Vec<Command>, variables: &HashMap<String, f32>) -> bool {
     true
-    /*let first = match first {
-        Operation::Identity(first) => get_value(first, variables),
-        Operation::Calculation((first, op, second)) => eval(*first, op, *second, variables),
-    };
-    let second = match second {
-        Operation::Identity(second) => get_value(second, variables),
-        Operation::Calculation((first, op, second)) => eval(*first, op, *second, variables),
-    };
-
-    match op {
-        Builtin::Equal => {
-            if first == second {
-                true
-            } else {
-                false
-            }
-        }
-        Builtin::Lesser => {
-            if first < second {
-                true
-            } else {
-                false
-            }
-        }
-        Builtin::Greater => {
-            if first > second {
-                true
-            } else {
-                false
-            }
-        }
-        Builtin::LesserOrEqual => {
-            if first <= second {
-                true
-            } else {
-                false
-            }
-        }
-        Builtin::GreaterOrEqual => {
-            if first >= second {
-                true
-            } else {
-                false
-            }
-        }
-        _ => unimplemented!(),
-    }*/
 }
 
 fn declare_variable(
@@ -107,8 +60,8 @@ fn main() {
           end if";
     // not working if we don't put \n after each Operation::Instanstiation inside the if command.. try content3 to see what happens..
     let content2 = "circle      \n x: 2\n if 2+x = 5\n square \n\n else circle\n  end if";
-    let content3 = "x: 3\n if 9.71 = 12.9 and x > 12 circle \n else \n square    \n  end if";
-    let (rest, ast) = parser(content2).unwrap();
+    let content3 = "x: 3\n if x <= 12 circle \n else \n square    \n  end if";
+    let (rest, ast) = parser(content3).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
     let mut nodes: Vec<Node> = vec![];
