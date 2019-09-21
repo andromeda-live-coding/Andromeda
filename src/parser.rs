@@ -201,6 +201,9 @@ pub fn draw_shape(input: &str) -> IResult<&str, Command, Error<&str>> {
 pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
     map(
         tuple((
+            multispace0,
+            tag("if"),
+            multispace0,
             condition,
             multispace0,
             many0(draw_shape),
@@ -210,7 +213,7 @@ pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
             )),
             tag("end if"),
         )),
-        |(pred, _, true_branch, maybe_false_branch, _)| {
+        |(_, _, _, pred, _, true_branch, maybe_false_branch, _)| {
             if let Some(false_branch) = maybe_false_branch {
                 Command::CommandIfElse((pred, true_branch, false_branch))
             } else {
@@ -221,29 +224,7 @@ pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
 }
 
 pub fn condition(input: &str) -> IResult<&str, Operation, Error<&str>> {
-    map(
-        tuple((
-            multispace0,
-            tag("if"),
-            multispace0,
-            expr,
-            multispace0,
-            alt((tag("<="), tag(">="), tag("="), tag("<"), tag(">"))),
-            multispace0,
-            expr,
-            multispace0,
-        )),
-        |(_, _, _, left, _, op, _, right, _)| match op {
-            "<=" => Operation::Condition((Box::new(left), Builtin::LesserOrEqual, Box::new(right))),
-            ">=" => {
-                Operation::Condition((Box::new(left), Builtin::GreaterOrEqual, Box::new(right)))
-            }
-            "=" => Operation::Condition((Box::new(left), Builtin::Equal, Box::new(right))),
-            "<" => Operation::Condition((Box::new(left), Builtin::Lesser, Box::new(right))),
-            ">" => Operation::Condition((Box::new(left), Builtin::Greater, Box::new(right))),
-            _ => unimplemented!(),
-        },
-    )(input)
+  
 }
 
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {

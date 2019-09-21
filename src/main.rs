@@ -107,7 +107,7 @@ fn main() {
           end if";
     // not working if we don't put \n after each Operation::Instanstiation inside the if command.. try content3 to see what happens..
     let content2 = "circle      \n x: 2\n if 2+x = 5\n square \n\n else circle\n  end if";
-    let content3 = "x: 3\n if 9.71 = 12.9 circle \n else \n square      end if";
+    let content3 = "x: 3\n if 9.71 = 12.9 and x > 12 circle \n else \n square    \n  end if";
     let (rest, ast) = parser(content2).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
