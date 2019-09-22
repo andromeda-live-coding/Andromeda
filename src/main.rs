@@ -60,7 +60,7 @@ fn main() {
           end if";
     // not working if we don't put \n after each Operation::Instanstiation inside the if command.. try content3 to see what happens..
     let content2 = "circle      \n x: 2\n if 2+x = 5\n square \n\n else circle\n  end if";
-    let content3 = "x: 3\n if x <= 12 circle \n else \n square    \n  end if";
+    let content3 = "x: 3\n if 3 < true and 19 > 21 circle \n end if";
     let (rest, ast) = parser(content3).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
@@ -85,6 +85,6 @@ fn main() {
     //assert_eq!(*variables.get("x").unwrap(), 1.0);
     //assert_eq!(*variables.get("y").unwrap(), 2.0);
     //assert_eq!(*variables.get("z").unwrap(), 6.0);
-    assert_eq!(rest, "");
+    //assert_eq!(rest, "");
     dbg!(rest);
 }

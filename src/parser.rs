@@ -139,6 +139,55 @@ fn term(i: &str) -> IResult<&str, Operation, Error<&str>> {
     )(i)
 }
 
+fn boolean_factor(input: &str) -> IResult<&str, Operation, Error<&str>> {
+    map(
+        tuple((
+            space0,
+            alt((
+                expr,
+                map(tag("true"), |_| Operation::Identity(Factor::Boolean(true))),
+                map(tag("false"), |_| {
+                    Operation::Identity(Factor::Boolean(false))
+                }),
+            )),
+            space0,
+        )),
+        |(_, fac, _)| fac,
+    )(input)
+}
+
+fn boolean_term(input: &str) -> IResult<&str, Operation, Error<&str>> {
+    let (i, init) = boolean_factor(input)?;
+
+    fold_many0(
+        pair(parse_and, boolean_factor),
+        init,
+        |acc, (op, val): (Builtin, Operation)| match op {
+            Builtin::And => {
+                Operation::BooleanCalculation((Box::new(acc), Builtin::And, Box::new(val)))
+            }
+            Builtin::Or => {
+                Operation::BooleanCalculation((Box::new(acc), Builtin::Or, Box::new(val)))
+            }
+            _ => unimplemented!(),
+        },
+    )(i)
+}
+
+pub fn parse_and(input: &str) -> IResult<&str, Builtin, Error<&str>> {
+    map(tag("and"), |op| match op {
+        "and" => Builtin::And,
+        _ => unreachable!(),
+    })(input)
+}
+
+pub fn parse_or(input: &str) -> IResult<&str, Builtin, Error<&str>> {
+    map(tag("or"), |op| match op {
+        "or" => Builtin::Or,
+        _ => unreachable!(),
+    })(input)
+}
+
 fn expr(i: &str) -> IResult<&str, Operation, Error<&str>> {
     let (i, init) = term(i)?;
 
@@ -195,16 +244,13 @@ pub fn draw_shape(input: &str) -> IResult<&str, Command, Error<&str>> {
     })(input)
 }
 
-// it should map an operation // operation and operation // operation or operation
-// we also need the commands to be interpreted for the true branch and for the false branch
-// it is also possible to have only the true branch
 pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
     map(
         tuple((
             multispace0,
             tag("if"),
             multispace0,
-            condition,
+            boolean_expr,
             multispace0,
             many0(draw_shape),
             opt(map(
@@ -223,43 +269,17 @@ pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
     )(input)
 }
 
+// it parse **boolean_expression**
+
 pub fn boolean_expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
-    let (rest, ast) = map(
-        tuple((
-            expr,
-            multispace0,
-            alt((tag("<="), tag(">="), tag("="), tag("<"), tag(">"))),
-            multispace0,
-            expr,
-        )),
-        |(left, _, op, _, right)| match op {
-            "<=" => Operation::BooleanCalculation((
-                Box::new(left),
-                Builtin::LesserOrEqual,
-                Box::new(right),
-            )),
-            ">=" => Operation::BooleanCalculation((
-                Box::new(left),
-                Builtin::GreaterOrEqual,
-                Box::new(right),
-            )),
-            "=" => Operation::BooleanCalculation((Box::new(left), Builtin::Equal, Box::new(right))),
-            "<" => {
-                Operation::BooleanCalculation((Box::new(left), Builtin::Lesser, Box::new(right)))
-            }
-            ">" => {
-                Operation::BooleanCalculation((Box::new(left), Builtin::Greater, Box::new(right)))
-            }
-            _ => unimplemented!(),
-        },
-    )(input)?;
+    let (rest, ast) = condition(input)?;
 
     fold_many0(
         pair(
             map(delimited(multispace0, tag("and"), multispace0), |_| {
                 Builtin::And
             }),
-            boolean_expr,
+            condition,
         ),
         ast,
         |acc, (op, val): (Builtin, Operation)| match op {
@@ -272,38 +292,35 @@ pub fn boolean_expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
 }
 
 pub fn condition(input: &str) -> IResult<&str, Operation, Error<&str>> {
-    alt((
-        // map(
-        //     tuple((
-        //         expr,
-        //         multispace0,
-        //         alt((tag("<="), tag(">="), tag("="), tag("<"), tag(">"))),
-        //         multispace0,
-        //         expr,
-        //         multispace0,
-        //         tag("and"),
-        //         multispace0,
-        //         condition,
-        //     )),
-        //     |(left, _, op, _, right, _, _, _, rest)| match op {
-        //         "<=" => Operation::BooleanCalculation((
-        //             Box::new(Operation::BooleanCalculation((
-        //                 (Box::new(left)),
-        //                 Builtin::LesserOrEqual,
-        //                 Box::new(right),
-        //             ))),
-        //             Builtin::And,
-        //             Box::new(rest),
-        //         )),
-        //         _ => unimplemented!(),
-        //     },
-        // ),
-        boolean_expr,
-        map(tag("true"), |_| Operation::Identity(Factor::Boolean(true))),
-        map(tag("false"), |_| {
-            Operation::Identity(Factor::Boolean(false))
-        }),
-    ))(input)
+    let (i, init) = boolean_term(input)?;
+
+    fold_many0(
+        pair(
+            delimited(
+                multispace0,
+                alt((tag("<="), tag(">="), tag("="), tag("<"), tag(">"))),
+                multispace0,
+            ),
+            condition,
+        ),
+        init,
+        |acc, (op, val): (&str, Operation)| match op {
+            "<=" => Operation::BooleanCalculation((
+                Box::new(acc),
+                Builtin::LesserOrEqual,
+                Box::new(val),
+            )),
+            ">=" => Operation::BooleanCalculation((
+                Box::new(acc),
+                Builtin::GreaterOrEqual,
+                Box::new(val),
+            )),
+            "=" => Operation::BooleanCalculation((Box::new(acc), Builtin::Equal, Box::new(val))),
+            ">" => Operation::BooleanCalculation((Box::new(acc), Builtin::Greater, Box::new(val))),
+            "<" => Operation::BooleanCalculation((Box::new(acc), Builtin::Lesser, Box::new(val))),
+            _ => unreachable!(),
+        },
+    )(i)
 }
 
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {
