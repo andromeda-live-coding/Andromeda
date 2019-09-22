@@ -106,6 +106,15 @@ pub fn variable(input: &str) -> IResult<&str, Factor, Error<&str>> {
     map(alpha1, |name: &str| Factor::Variable(name.to_string()))(input)
 }
 
+pub fn variable2(input: &str) -> IResult<&str, Factor, Error<&str>> {
+    let (rest, var) = alpha1(input)?;
+    if var != "true" && var != "false" {
+        Ok((rest, Factor::Variable(var.to_string())))
+    } else {
+        unimplemented!();
+    }
+}
+
 pub fn number(input: &str) -> IResult<&str, Factor, Error<&str>> {
     map(float, |value: f32| Factor::Number(value))(input)
 }
@@ -219,8 +228,6 @@ pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
         },
     )(input)
 }
-
-// it parse **boolean_expression**
 
 pub fn boolean_expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
     let (rest, init) = boolean_term(input)?;
@@ -493,4 +500,34 @@ mod tests {
         assert_eq!(rest, "");
     }
 
+    #[test]
+    fn boolean_expression() {
+        let content = "2 > 1";
+        let (rest, _ast) = boolean_expr(content).unwrap();
+
+        assert_eq!(rest, "");
+
+        let content = " x <= y ";
+        let (rest, _ast) = boolean_expr(content).unwrap();
+
+        assert_eq!(rest, "");
+
+        let content = " 2 < 1 and  3 > 2";
+        let (rest, _ast) = boolean_expr(content).unwrap();
+
+        assert_eq!(rest, "");
+    }
+
+    #[test]
+    fn if_command() {
+        let content = "if x = 1 and (y >= x or x > 3) square \n end if";
+        let (rest, _ast) = command_if(content).unwrap();
+
+        assert_eq!(rest, "");
+
+        let content = "if x = 1 and (y >= x or x > 3) square \n else circle 22.91 \n end if";
+        let (rest, _ast) = command_if(content).unwrap();
+
+        assert_eq!(rest, "");
+    }
 }
