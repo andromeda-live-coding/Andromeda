@@ -139,55 +139,6 @@ fn term(i: &str) -> IResult<&str, Operation, Error<&str>> {
     )(i)
 }
 
-fn boolean_factor(input: &str) -> IResult<&str, Operation, Error<&str>> {
-    map(
-        tuple((
-            space0,
-            alt((
-                expr,
-                map(tag("true"), |_| Operation::Identity(Factor::Boolean(true))),
-                map(tag("false"), |_| {
-                    Operation::Identity(Factor::Boolean(false))
-                }),
-            )),
-            space0,
-        )),
-        |(_, fac, _)| fac,
-    )(input)
-}
-
-fn boolean_term(input: &str) -> IResult<&str, Operation, Error<&str>> {
-    let (i, init) = boolean_factor(input)?;
-
-    fold_many0(
-        pair(parse_and, boolean_factor),
-        init,
-        |acc, (op, val): (Builtin, Operation)| match op {
-            Builtin::And => {
-                Operation::BooleanCalculation((Box::new(acc), Builtin::And, Box::new(val)))
-            }
-            Builtin::Or => {
-                Operation::BooleanCalculation((Box::new(acc), Builtin::Or, Box::new(val)))
-            }
-            _ => unimplemented!(),
-        },
-    )(i)
-}
-
-pub fn parse_and(input: &str) -> IResult<&str, Builtin, Error<&str>> {
-    map(tag("and"), |op| match op {
-        "and" => Builtin::And,
-        _ => unreachable!(),
-    })(input)
-}
-
-pub fn parse_or(input: &str) -> IResult<&str, Builtin, Error<&str>> {
-    map(tag("or"), |op| match op {
-        "or" => Builtin::Or,
-        _ => unreachable!(),
-    })(input)
-}
-
 fn expr(i: &str) -> IResult<&str, Operation, Error<&str>> {
     let (i, init) = term(i)?;
 
@@ -273,7 +224,7 @@ pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
 
 pub fn boolean_expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
     let (rest, ast) = condition(input)?;
-
+    // it find multiple and .. to implement multiple or
     fold_many0(
         pair(
             map(delimited(multispace0, tag("and"), multispace0), |_| {
@@ -321,6 +272,55 @@ pub fn condition(input: &str) -> IResult<&str, Operation, Error<&str>> {
             _ => unreachable!(),
         },
     )(i)
+}
+
+fn boolean_term(input: &str) -> IResult<&str, Operation, Error<&str>> {
+    boolean_factor(input)
+
+    // fold_many0(
+    //     pair(parse_and, condition),
+    //     init,
+    //     |acc, (op, val): (Builtin, Operation)| match op {
+    //         Builtin::And => {
+    //             Operation::BooleanCalculation((Box::new(acc), Builtin::And, Box::new(val)))
+    //         }
+    //         Builtin::Or => {
+    //             Operation::BooleanCalculation((Box::new(acc), Builtin::Or, Box::new(val)))
+    //         }
+    //         _ => unimplemented!(),
+    //     },
+    // )(i)
+}
+
+fn boolean_factor(input: &str) -> IResult<&str, Operation, Error<&str>> {
+    map(
+        tuple((
+            space0,
+            alt((
+                expr,
+                map(tag("true"), |_| Operation::Identity(Factor::Boolean(true))),
+                map(tag("false"), |_| {
+                    Operation::Identity(Factor::Boolean(false))
+                }),
+            )),
+            space0,
+        )),
+        |(_, fac, _)| fac,
+    )(input)
+}
+
+pub fn parse_and(input: &str) -> IResult<&str, Builtin, Error<&str>> {
+    map(tag("and"), |op| match op {
+        "and" => Builtin::And,
+        _ => unreachable!(),
+    })(input)
+}
+
+pub fn parse_or(input: &str) -> IResult<&str, Builtin, Error<&str>> {
+    map(tag("or"), |op| match op {
+        "or" => Builtin::Or,
+        _ => unreachable!(),
+    })(input)
 }
 
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {
