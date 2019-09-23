@@ -213,7 +213,11 @@ pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
                 boolean_expr,
                 many0(alt((draw_shape, assignment))),
             ))),
-            opt(tuple((tag("else"), multispace0, many0(alt((draw_shape, assignment)))))),
+            opt(tuple((
+                tag("else"),
+                multispace0,
+                many0(alt((draw_shape, assignment))),
+            ))),
             tag("end if"),
         )),
         |(_, pred, then_branch, multiple_elif, maybe_else_branch, _)| {
@@ -566,42 +570,30 @@ mod tests {
         assert_eq!(rest, "");
     }
 
-    // #[test]
-    // fn if_command() {
-    //     let content = "if x = 1 and (y >= x or x > 3) square \n end if";
-    //     let (rest, ast) = command_if(content).unwrap();
-
-    //     let vector = vec![Command::Instantiation(Node::Square((
-    //         Operation::Identity(Factor::Number(1.0)),
-    //         Operation::Identity(Factor::Number(1.0)),
-    //     )))];
-
-    //     assert_eq!(
-    //         ast,
-    //         Command::CommandIf((
-    //             Operation::Condition((
-    //                 Box::new(Operation::Condition((
-    //                     Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
-    //                     Builtin::Equal,
-    //                     Box::new(Operation::Identity(Factor::Number(1.0)))
-    //                 ))),
-    //                 Builtin::And,
-    //                 Box::new(Operation::Condition((
-    //                     Box::new(Operation::Condition((
-    //                         Box::new(Operation::Identity(Factor::Variable("y".to_string()))),
-    //                         Builtin::GreaterOrEqual,
-    //                         Box::new(Operation::Identity(Factor::Variable("x".to_string())))
-    //                     ))),
-    //                     Builtin::Or,
-    //                     Box::new(Operation::Condition((
-    //                         Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
-    //                         Builtin::Greater,
-    //                         Box::new(Operation::Identity(Factor::Number(3.0)))
-    //                     )))
-    //                 )))
-    //             )),
-    //             vector
-    //         ))
-    //     );
-    // }
+    #[test]
+    fn if_command() {
+        // to test
+        let content = "if x = 1 and (y >= x or x > 3) square \n end if";
+        let content2 = "if x = 1 circle \n end if";
+        let (rest, ast) = command_if(content2).unwrap();
+        assert_eq!(rest, "");
+        //     let vector = vec![Command::Instantiation(Node::Square((
+        //         Operation::Identity(Factor::Number(1.0)),
+        //         Operation::Identity(Factor::Number(1.0)),
+        //     )))];
+        assert_eq!(
+            ast,
+            Command::ConditionalBlock(vec![(
+                ConditionalBuiltin::IfB,
+                Operation::Condition((
+                    Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
+                    Builtin::Equal,
+                    Box::new(Operation::Identity(Factor::Number(1.0)))
+                )),
+                vec![Command::Instantiation(Node::Circle(Operation::Identity(
+                    Factor::Number(1.0)
+                )))]
+            )])
+        );
+    }
 }
