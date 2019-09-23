@@ -82,6 +82,15 @@ pub enum Node {
 pub enum Command {
     Declaration((String, Operation)),
     Instantiation(Node),
+    CommandIfElseif(
+        (
+            Operation,
+            Vec<Command>,
+            Operation,
+            Vec<Command>,
+            Vec<Command>,
+        ),
+    ),
     CommandIfElse((Operation, Vec<Command>, Vec<Command>)),
     CommandIf((Operation, Vec<Command>)),
 }
@@ -106,6 +115,7 @@ pub fn variable(input: &str) -> IResult<&str, Factor, Error<&str>> {
     map(alpha1, |name: &str| Factor::Variable(name.to_string()))(input)
 }
 
+// variables should not be called "true" or "false" because they are KW
 pub fn variable2(input: &str) -> IResult<&str, Factor, Error<&str>> {
     let (rest, var) = alpha1(input)?;
     if var != "true" && var != "false" {
@@ -114,7 +124,6 @@ pub fn variable2(input: &str) -> IResult<&str, Factor, Error<&str>> {
         unimplemented!();
     }
 }
-
 pub fn number(input: &str) -> IResult<&str, Factor, Error<&str>> {
     map(float, |value: f32| Factor::Number(value))(input)
 }
@@ -214,16 +223,44 @@ pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
             multispace0,
             many0(draw_shape),
             opt(map(
+                tuple((
+                    tag("else if"),
+                    multispace0,
+                    boolean_expr,
+                    multispace0,
+                    many0(draw_shape),
+                    multispace0,
+                    tag("else"),
+                    multispace0,
+                    many0(draw_shape),
+                )),
+                |(_, _, pred2, _, cmd_else_if, _, _, _, cmd_else)| ((pred2, cmd_else_if, cmd_else)),
+            )),
+            opt(map(
                 tuple((tag("else"), multispace0, many0(draw_shape))),
                 |(_, _, commands)| commands,
             )),
             tag("end if"),
         )),
-        |(_, _, _, pred, _, true_branch, maybe_false_branch, _)| {
-            if let Some(false_branch) = maybe_false_branch {
-                Command::CommandIfElse((pred, true_branch, false_branch))
+        |(_, _, _, pred, _, true_branch, maybe_else_if_branch, maybe_false_branch, _)| {
+            if let Some((pred_elif, true_elif_branch, false_elif_branch)) = maybe_else_if_branch {
+                if let Some(_) = maybe_false_branch {
+                    unimplemented!();
+                } else {
+                    Command::CommandIfElseif((
+                        pred,
+                        true_branch,
+                        pred_elif,
+                        true_elif_branch,
+                        false_elif_branch,
+                    ))
+                }
             } else {
-                Command::CommandIf((pred, true_branch))
+                if let Some(false_branch) = maybe_false_branch {
+                    Command::CommandIfElse((pred, true_branch, false_branch))
+                } else {
+                    Command::CommandIf((pred, true_branch))
+                }
             }
         },
     )(input)
