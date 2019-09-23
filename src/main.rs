@@ -59,7 +59,7 @@ fn main() {
           circle  17.1 
           end if";
     let content2 = "circle      \n x: 2\n if 2+x = 5\n square \n\n else circle\n  end if";
-    let content3 = "if x = 1 and (y >= x or x > 3) square \n end if";
+    let content3 = "if x = 1 + 2 and (y >= x or x > 3)    square \n else if 1>2 circle \n else circle\n end if";
     let (rest, ast) = parser(content3).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
@@ -71,16 +71,8 @@ fn main() {
                 variables.insert(name, value);
             }
             Command::Instantiation(node) => nodes.push(node),
-            Command::CommandIf((x, y)) => {
-                if eval_if(x, y, &variables) {
-                    println!("true")
-                } else {
-                    println!("false")
-                }
-            }
-            Command::CommandIfElse(_) => println!("if else found"),
-            Command::CommandIfElseif(_) => println!("if else if else found"),
-            Command::ConditionalBlock(_) => (),
+            Command::ConditionalBlock(_) => (println!("bufu")),
+            Command::ListOfCommands(_) => (println!("bufu2")),
         }
     }
     // assert_eq!(*variables.get("x").unwrap(), 1.0);
