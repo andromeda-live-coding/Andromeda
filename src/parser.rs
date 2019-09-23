@@ -1,7 +1,7 @@
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, multispace0, one_of, space0};
-use nom::combinator::{map, opt};
+use nom::combinator::{map, map_parser, not, opt};
 use nom::error::VerboseError as Error;
 use nom::multi::{fold_many0, many0, many_m_n};
 use nom::number::complete::float;
@@ -25,7 +25,6 @@ pub enum Builtin {
     Or,
 }
 
-// Factor can be a boolean.. true or false
 #[derive(Debug, PartialEq, Clone)]
 pub enum Factor {
     Variable(String),
@@ -37,7 +36,7 @@ pub enum Factor {
 pub enum Operation {
     Identity(Factor),
     Calculation((Box<Operation>, Builtin, Box<Operation>)),
-    BooleanCalculation((Box<Operation>, Builtin, Box<Operation>)),
+    Condition((Box<Operation>, Builtin, Box<Operation>)),
 }
 
 impl Mul for Operation {
@@ -112,18 +111,15 @@ pub fn sum(input: &str) -> IResult<&str, Builtin, Error<&str>> {
 }
 
 pub fn variable(input: &str) -> IResult<&str, Factor, Error<&str>> {
-    map(alpha1, |name: &str| Factor::Variable(name.to_string()))(input)
+    map(map_parser(alpha1, keywords), |x: &str| {
+        Factor::Variable(x.to_string())
+    })(input)
 }
 
-// variables should not be called "true" or "false" because they are KW
-pub fn variable2(input: &str) -> IResult<&str, Factor, Error<&str>> {
-    let (rest, var) = alpha1(input)?;
-    if var != "true" && var != "false" {
-        Ok((rest, Factor::Variable(var.to_string())))
-    } else {
-        unimplemented!();
-    }
+pub fn keywords(input: &str) -> IResult<&str, &str, Error<&str>> {
+    not(alt((tag("true"), tag("false"))))(input)
 }
+
 pub fn number(input: &str) -> IResult<&str, Factor, Error<&str>> {
     map(float, |value: f32| Factor::Number(value))(input)
 }
@@ -278,9 +274,7 @@ pub fn boolean_expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
         ),
         init,
         |acc, (op, val): (Builtin, Operation)| match op {
-            Builtin::Or => {
-                Operation::BooleanCalculation((Box::new(acc), Builtin::Or, Box::new(val)))
-            }
+            Builtin::Or => Operation::Condition((Box::new(acc), Builtin::Or, Box::new(val))),
             _ => unimplemented!(),
         },
     )(rest)
@@ -298,23 +292,13 @@ pub fn condition(input: &str) -> IResult<&str, Operation, Error<&str>> {
             multispace0,
         )),
         |(_, left, _, op, _, right, _)| match op {
-            "<=" => Operation::BooleanCalculation((
-                Box::new(left),
-                Builtin::LesserOrEqual,
-                Box::new(right),
-            )),
-            ">=" => Operation::BooleanCalculation((
-                Box::new(left),
-                Builtin::GreaterOrEqual,
-                Box::new(right),
-            )),
-            "=" => Operation::BooleanCalculation((Box::new(left), Builtin::Equal, Box::new(right))),
-            ">" => {
-                Operation::BooleanCalculation((Box::new(left), Builtin::Greater, Box::new(right)))
+            "<=" => Operation::Condition((Box::new(left), Builtin::LesserOrEqual, Box::new(right))),
+            ">=" => {
+                Operation::Condition((Box::new(left), Builtin::GreaterOrEqual, Box::new(right)))
             }
-            "<" => {
-                Operation::BooleanCalculation((Box::new(left), Builtin::Lesser, Box::new(right)))
-            }
+            "=" => Operation::Condition((Box::new(left), Builtin::Equal, Box::new(right))),
+            ">" => Operation::Condition((Box::new(left), Builtin::Greater, Box::new(right))),
+            "<" => Operation::Condition((Box::new(left), Builtin::Lesser, Box::new(right))),
             _ => unreachable!(),
         },
     )(input)
@@ -327,7 +311,7 @@ fn boolean_term(input: &str) -> IResult<&str, Operation, Error<&str>> {
         pair(tag("and"), boolean_factor),
         init,
         |acc, (op, val): (&str, Operation)| match op {
-            "and" => Operation::BooleanCalculation((Box::new(acc), Builtin::And, Box::new(val))),
+            "and" => Operation::Condition((Box::new(acc), Builtin::And, Box::new(val))),
             _ => unimplemented!(),
         },
     )(rest)
@@ -540,31 +524,92 @@ mod tests {
     #[test]
     fn boolean_expression() {
         let content = "2 > 1";
-        let (rest, _ast) = boolean_expr(content).unwrap();
-
+        let (rest, ast) = boolean_expr(content).unwrap();
+        assert_eq!(
+            ast,
+            Operation::Condition((
+                Box::new(Operation::Identity(Factor::Number(2.0))),
+                Builtin::Greater,
+                Box::new(Operation::Identity(Factor::Number(1.0)))
+            ))
+        );
         assert_eq!(rest, "");
+    }
 
+    #[test]
+    fn boolean_expression_with_variables() {
         let content = " x <= y ";
-        let (rest, _ast) = boolean_expr(content).unwrap();
-
+        let (rest, ast) = boolean_expr(content).unwrap();
+        assert_eq!(
+            ast,
+            Operation::Condition((
+                Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
+                Builtin::LesserOrEqual,
+                Box::new(Operation::Identity(Factor::Variable("y".to_string())))
+            ))
+        );
         assert_eq!(rest, "");
+    }
 
+    #[test]
+    fn boolean_expression2() {
         let content = " 2 < 1 and  3 > 2";
-        let (rest, _ast) = boolean_expr(content).unwrap();
-
+        let (rest, ast) = boolean_expr(content).unwrap();
+        assert_eq!(
+            ast,
+            Operation::Condition((
+                Box::new(Operation::Condition((
+                    Box::new(Operation::Identity(Factor::Number(2.0))),
+                    Builtin::Lesser,
+                    Box::new(Operation::Identity(Factor::Number(1.0)))
+                ))),
+                Builtin::And,
+                Box::new(Operation::Condition((
+                    Box::new(Operation::Identity(Factor::Number(3.0))),
+                    Builtin::Greater,
+                    Box::new(Operation::Identity(Factor::Number(2.0)))
+                ))),
+            ))
+        );
         assert_eq!(rest, "");
     }
 
     #[test]
     fn if_command() {
         let content = "if x = 1 and (y >= x or x > 3) square \n end if";
-        let (rest, _ast) = command_if(content).unwrap();
+        let (rest, ast) = command_if(content).unwrap();
 
-        assert_eq!(rest, "");
+        let vector = vec![Command::Instantiation(Node::Square((
+            Operation::Identity(Factor::Number(1.0)),
+            Operation::Identity(Factor::Number(1.0)),
+        )))];
 
-        let content = "if x = 1 and (y >= x or x > 3) square \n else circle 22.91 \n end if";
-        let (rest, _ast) = command_if(content).unwrap();
-
-        assert_eq!(rest, "");
+        assert_eq!(
+            ast,
+            Command::CommandIf((
+                Operation::Condition((
+                    Box::new(Operation::Condition((
+                        Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
+                        Builtin::Equal,
+                        Box::new(Operation::Identity(Factor::Number(1.0)))
+                    ))),
+                    Builtin::And,
+                    Box::new(Operation::Condition((
+                        Box::new(Operation::Condition((
+                            Box::new(Operation::Identity(Factor::Variable("y".to_string()))),
+                            Builtin::GreaterOrEqual,
+                            Box::new(Operation::Identity(Factor::Variable("x".to_string())))
+                        ))),
+                        Builtin::Or,
+                        Box::new(Operation::Condition((
+                            Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
+                            Builtin::Greater,
+                            Box::new(Operation::Identity(Factor::Number(3.0)))
+                        )))
+                    )))
+                )),
+                vector
+            ))
+        );
     }
 }
