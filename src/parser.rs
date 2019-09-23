@@ -1,7 +1,7 @@
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, multispace0, one_of, space0};
-use nom::combinator::{map, map_parser, not, opt};
+use nom::combinator::{map, opt};
 use nom::error::VerboseError as Error;
 use nom::multi::{fold_many0, many0, many_m_n};
 use nom::number::complete::float;
@@ -92,6 +92,8 @@ pub enum Command {
     ),
     CommandIfElse((Operation, Vec<Command>, Vec<Command>)),
     CommandIf((Operation, Vec<Command>)),
+
+    ConditionalBlock(Vec<(Builtin, Operation, Vec<Command>)>),
 }
 
 pub fn mult(input: &str) -> IResult<&str, Builtin, Error<&str>> {
@@ -111,13 +113,7 @@ pub fn sum(input: &str) -> IResult<&str, Builtin, Error<&str>> {
 }
 
 pub fn variable(input: &str) -> IResult<&str, Factor, Error<&str>> {
-    map(map_parser(alpha1, keywords), |x: &str| {
-        Factor::Variable(x.to_string())
-    })(input)
-}
-
-pub fn keywords(input: &str) -> IResult<&str, &str, Error<&str>> {
-    not(alt((tag("true"), tag("false"))))(input)
+    map(alpha1, |v: &str| Factor::Variable(v.to_string()))(input)
 }
 
 pub fn number(input: &str) -> IResult<&str, Factor, Error<&str>> {
@@ -212,33 +208,26 @@ pub fn draw_shape(input: &str) -> IResult<&str, Command, Error<&str>> {
 pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
     map(
         tuple((
-            multispace0,
             tag("if"),
-            multispace0,
             boolean_expr,
-            multispace0,
             many0(draw_shape),
             opt(map(
                 tuple((
                     tag("else if"),
-                    multispace0,
                     boolean_expr,
-                    multispace0,
                     many0(draw_shape),
-                    multispace0,
                     tag("else"),
-                    multispace0,
                     many0(draw_shape),
                 )),
-                |(_, _, pred2, _, cmd_else_if, _, _, _, cmd_else)| ((pred2, cmd_else_if, cmd_else)),
+                |(_, pred2, cmd_else_if, _, cmd_else)| ((pred2, cmd_else_if, cmd_else)),
             )),
             opt(map(
-                tuple((tag("else"), multispace0, many0(draw_shape))),
-                |(_, _, commands)| commands,
+                tuple((tag("else"), many0(draw_shape))),
+                |(_, commands)| commands,
             )),
             tag("end if"),
         )),
-        |(_, _, _, pred, _, true_branch, maybe_else_if_branch, maybe_false_branch, _)| {
+        |(_, pred, true_branch, maybe_else_if_branch, maybe_false_branch, _)| {
             if let Some((pred_elif, true_elif_branch, false_elif_branch)) = maybe_else_if_branch {
                 if let Some(_) = maybe_false_branch {
                     unimplemented!();
@@ -283,15 +272,11 @@ pub fn boolean_expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
 pub fn condition(input: &str) -> IResult<&str, Operation, Error<&str>> {
     map(
         tuple((
-            multispace0,
             expr,
-            multispace0,
             alt((tag("<="), tag(">="), tag("="), tag("<"), tag(">"))),
-            multispace0,
             expr,
-            multispace0,
         )),
-        |(_, left, _, op, _, right, _)| match op {
+        |(left, op, right)| match op {
             "<=" => Operation::Condition((Box::new(left), Builtin::LesserOrEqual, Box::new(right))),
             ">=" => {
                 Operation::Condition((Box::new(left), Builtin::GreaterOrEqual, Box::new(right)))

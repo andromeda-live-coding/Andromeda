@@ -80,6 +80,7 @@ fn main() {
             }
             Command::CommandIfElse(_) => println!("if else found"),
             Command::CommandIfElseif(_) => println!("if else if else found"),
+            Command::ConditionalBlock(_) => (),
         }
     }
     // assert_eq!(*variables.get("x").unwrap(), 1.0);
