@@ -30,7 +30,10 @@ fn eval(first: Operation, op: Builtin, second: Operation, variables: &HashMap<St
     }
 }
 
-fn eval_if(pred: Operation, true_branch: Vec<Command>, variables: &HashMap<String, f32>) -> bool {
+fn eval_if(
+    yy: Vec<(ConditionalBuiltin, Operation, Vec<Command>)>,
+    variables: &HashMap<String, f32>,
+) -> bool {
     true
 }
 
@@ -59,7 +62,7 @@ fn main() {
           circle  17.1 
           end if";
     let content2 = "circle      \n x: 2\n if 2+x = 5\n square \n\n else circle\n  end if";
-    let content3 = "if x = 1 if3<9 circle\n end if\n end if\n";
+    let content3 = "if x = 1 if 3<9 circle\n end if\n end if\n";
     let (rest, ast) = parser(content3).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
@@ -71,7 +74,11 @@ fn main() {
                 variables.insert(name, value);
             }
             Command::Instantiation(node) => nodes.push(node),
-            Command::ConditionalBlock(_) => (),
+            Command::ConditionalBlock(l) => {
+                for (x, y, z) in l {
+                    unimplemented!();
+                }
+            },
         }
     }
     // assert_eq!(*variables.get("x").unwrap(), 1.0);
