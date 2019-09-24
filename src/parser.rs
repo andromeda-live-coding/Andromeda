@@ -1,13 +1,15 @@
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, multispace0, one_of, space0};
-use nom::combinator::map;
+use nom::combinator::{map, opt};
+use nom::error::ErrorKind;
 use nom::error::VerboseError as Error;
+use nom::error::VerboseErrorKind;
 use nom::multi::{fold_many0, many0, many_m_n};
 use nom::number::complete::float;
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
+use nom::Err;
 use nom::IResult;
-
 use std::ops::{Add, Div, Mul, Sub};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -16,18 +18,28 @@ pub enum Builtin {
     Minus,
     Mult,
     Div,
+    Greater,
+    Lesser,
+    GreaterOrEqual,
+    LesserOrEqual,
+    Equal,
+    And,
+    Or,
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Factor {
     Variable(String),
     Number(f32),
+    Boolean(bool),
 }
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Operation {
     Identity(Factor),
     Calculation((Box<Operation>, Builtin, Box<Operation>)),
+    Condition((Box<Operation>, Builtin, Box<Operation>)),
+    Nil,
 }
 
 impl Mul for Operation {
@@ -69,9 +81,25 @@ pub enum Node {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum ConditionalBuiltin {
+    IfB,
+    ElseIfB,
+    ElseB,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Command {
     Declaration((String, Operation)),
     Instantiation(Node),
+    ConditionalBlock(Vec<(ConditionalBuiltin, Operation, Vec<Command>)>),
+}
+
+pub fn variable(input: &str) -> IResult<&str, Factor, Error<&str>> {
+    map(alpha1, |v: &str| Factor::Variable(v.to_string()))(input)
+}
+
+pub fn number(input: &str) -> IResult<&str, Factor, Error<&str>> {
+    map(float, |value: f32| Factor::Number(value))(input)
 }
 
 pub fn mult(input: &str) -> IResult<&str, Builtin, Error<&str>> {
@@ -88,14 +116,6 @@ pub fn sum(input: &str) -> IResult<&str, Builtin, Error<&str>> {
         '-' => Builtin::Minus,
         _ => unreachable!(),
     })(input)
-}
-
-pub fn variable(input: &str) -> IResult<&str, Factor, Error<&str>> {
-    map(alpha1, |name: &str| Factor::Variable(name.to_string()))(input)
-}
-
-pub fn number(input: &str) -> IResult<&str, Factor, Error<&str>> {
-    map(float, |value: f32| Factor::Number(value))(input)
 }
 
 pub fn factor(input: &str) -> IResult<&str, Operation, Error<&str>> {
@@ -178,12 +198,144 @@ pub fn circle(input: &str) -> IResult<&str, Node, Error<&str>> {
 }
 
 pub fn draw_shape(input: &str) -> IResult<&str, Command, Error<&str>> {
-    map(alt((circle, square)), Command::Instantiation)(input)
+    map(tuple((alt((circle, square)), multispace0)), |(v, _)| {
+        Command::Instantiation(v)
+    })(input)
+}
+
+pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
+    map(
+        tuple((
+            tag("if"),
+            boolean_expr,
+            many0(alt((command_if, draw_shape, assignment))),
+            many0(tuple((
+                tag("else if"),
+                boolean_expr,
+                many0(alt((command_if, draw_shape, assignment))),
+            ))),
+            opt(tuple((
+                tag("else"),
+                multispace0,
+                many0(alt((command_if, draw_shape, assignment))),
+            ))),
+            tag("end if"),
+            multispace0,
+        )),
+        |(_, pred, then_branch, multiple_elif, maybe_else_branch, _, _)| {
+            if multiple_elif.len() > 0 {
+                if let Some((_, _, cmd)) = maybe_else_branch {
+                    let mut my_vec: Vec<(ConditionalBuiltin, Operation, Vec<Command>)> = Vec::new();
+                    my_vec.push((ConditionalBuiltin::IfB, pred, then_branch));
+                    for (zz, c, ab) in multiple_elif {
+                        match zz {
+                            "if" => {
+                                my_vec.push((ConditionalBuiltin::IfB, c, ab));
+                            }
+                            "else if" => {
+                                my_vec.push((ConditionalBuiltin::ElseIfB, c, ab));
+                            }
+                            "else" => {
+                                my_vec.push((ConditionalBuiltin::ElseB, c, ab));
+                            }
+                            _ => unimplemented!(),
+                        }
+                    }
+                    // TODOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+                    my_vec.push((ConditionalBuiltin::ElseB, Operation::Nil, cmd));
+                    Command::ConditionalBlock(my_vec)
+                } else {
+                    unimplemented!(); // else if ** no else ____ ERROR ERROR ERROR
+                }
+            } else {
+                let mut my_vec: Vec<(ConditionalBuiltin, Operation, Vec<Command>)> = Vec::new();
+                if let Some((_, _, cmd)) = maybe_else_branch {
+                    // TODOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
+                    // no else if ** else   DONE
+                    my_vec.push((ConditionalBuiltin::IfB, pred, then_branch));
+                    my_vec.push((ConditionalBuiltin::ElseB, Operation::Nil, cmd));
+                } else {
+                    // no else if ** no else DONE
+                    my_vec.push((ConditionalBuiltin::IfB, pred, then_branch));
+                }
+                Command::ConditionalBlock(my_vec)
+            }
+        },
+    )(input)
+}
+
+pub fn boolean_expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
+    let (rest, init) = boolean_term(input)?;
+
+    fold_many0(
+        pair(
+            map(delimited(multispace0, tag("or"), multispace0), |_| {
+                Builtin::Or
+            }),
+            boolean_term,
+        ),
+        init,
+        |acc, (op, val): (Builtin, Operation)| match op {
+            Builtin::Or => Operation::Condition((Box::new(acc), Builtin::Or, Box::new(val))),
+            _ => unimplemented!(),
+        },
+    )(rest)
+}
+
+pub fn condition(input: &str) -> IResult<&str, Operation, Error<&str>> {
+    map(
+        tuple((
+            expr,
+            alt((tag("<="), tag(">="), tag("="), tag("<"), tag(">"))),
+            expr,
+        )),
+        |(left, op, right)| match op {
+            "<=" => Operation::Condition((Box::new(left), Builtin::LesserOrEqual, Box::new(right))),
+            ">=" => {
+                Operation::Condition((Box::new(left), Builtin::GreaterOrEqual, Box::new(right)))
+            }
+            "=" => Operation::Condition((Box::new(left), Builtin::Equal, Box::new(right))),
+            ">" => Operation::Condition((Box::new(left), Builtin::Greater, Box::new(right))),
+            "<" => Operation::Condition((Box::new(left), Builtin::Lesser, Box::new(right))),
+            _ => unreachable!(),
+        },
+    )(input)
+}
+
+fn boolean_factor(input: &str) -> IResult<&str, Operation, Error<&str>> {
+    map(
+        tuple((
+            space0,
+            alt((
+                delimited(tag("("), boolean_expr, tag(")")),
+                condition,
+                map(tag("true"), |_| Operation::Identity(Factor::Boolean(true))),
+                map(tag("false"), |_| {
+                    Operation::Identity(Factor::Boolean(false))
+                }),
+            )),
+            space0,
+        )),
+        |(_, fac, _)| fac,
+    )(input)
+}
+
+fn boolean_term(input: &str) -> IResult<&str, Operation, Error<&str>> {
+    let (rest, init) = boolean_factor(input)?;
+
+    fold_many0(
+        pair(tag("and"), boolean_factor),
+        init,
+        |acc, (op, val): (&str, Operation)| match op {
+            "and" => Operation::Condition((Box::new(acc), Builtin::And, Box::new(val))),
+            _ => unimplemented!(),
+        },
+    )(rest)
 }
 
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {
     many0(terminated(
-        preceded(multispace0, alt((draw_shape, assignment))),
+        preceded(multispace0, alt((command_if, draw_shape, assignment))),
         multispace0,
     ))(input)
 }
@@ -365,5 +517,94 @@ mod tests {
         let (rest, _ast) = parser(expression).unwrap();
 
         assert_eq!(rest, "");
+    }
+
+    #[test]
+    fn boolean_expression() {
+        let content = "2 > 1";
+        let (rest, ast) = boolean_expr(content).unwrap();
+        assert_eq!(
+            ast,
+            Operation::Condition((
+                Box::new(Operation::Identity(Factor::Number(2.0))),
+                Builtin::Greater,
+                Box::new(Operation::Identity(Factor::Number(1.0)))
+            ))
+        );
+        assert_eq!(rest, "");
+    }
+
+    #[test]
+    fn boolean_expression_with_variables() {
+        let content = " x <= y ";
+        let (rest, ast) = boolean_expr(content).unwrap();
+        assert_eq!(
+            ast,
+            Operation::Condition((
+                Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
+                Builtin::LesserOrEqual,
+                Box::new(Operation::Identity(Factor::Variable("y".to_string())))
+            ))
+        );
+        assert_eq!(rest, "");
+    }
+
+    #[test]
+    fn boolean_expression2() {
+        let content = " 2 < 1 and  3 > 2";
+        let (rest, ast) = boolean_expr(content).unwrap();
+        assert_eq!(
+            ast,
+            Operation::Condition((
+                Box::new(Operation::Condition((
+                    Box::new(Operation::Identity(Factor::Number(2.0))),
+                    Builtin::Lesser,
+                    Box::new(Operation::Identity(Factor::Number(1.0)))
+                ))),
+                Builtin::And,
+                Box::new(Operation::Condition((
+                    Box::new(Operation::Identity(Factor::Number(3.0))),
+                    Builtin::Greater,
+                    Box::new(Operation::Identity(Factor::Number(2.0)))
+                ))),
+            ))
+        );
+        assert_eq!(rest, "");
+    }
+
+    #[test]
+    fn if_command() {
+        let content = "if x = 1 and (y >= x or x > 3) circle \n end if";
+        let (rest, ast) = command_if(content).unwrap();
+        assert_eq!(
+            ast,
+            Command::ConditionalBlock(vec![(
+                ConditionalBuiltin::IfB,
+                Operation::Condition((
+                    Box::new(Operation::Condition((
+                        Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
+                        Builtin::Equal,
+                        Box::new(Operation::Identity(Factor::Number(1.0)))
+                    ))),
+                    Builtin::And,
+                    Box::new(Operation::Condition((
+                        Box::new(Operation::Condition((
+                            Box::new(Operation::Identity(Factor::Variable("y".to_string()))),
+                            Builtin::GreaterOrEqual,
+                            Box::new(Operation::Identity(Factor::Variable("x".to_string())))
+                        ))),
+                        Builtin::Or,
+                        Box::new(Operation::Condition((
+                            Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
+                            Builtin::Greater,
+                            Box::new(Operation::Identity(Factor::Number(3.0)))
+                        )))
+                    )))
+                )),
+                vec![Command::Instantiation(Node::Circle(Operation::Identity(
+                    Factor::Number(1.0)
+                )))]
+            )])
+        );
     }
 }
