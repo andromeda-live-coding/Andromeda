@@ -59,7 +59,7 @@ fn main() {
           circle  17.1 
           end if";
     let content2 = "circle      \n x: 2\n if 2+x = 5\n square \n\n else circle\n  end if";
-    let content3 = "if x = 1 + 2 and (y >= x or x > 3)    square \n else if 1>2 circle \n else circle\n end if";
+    let content3 = "if x = 1 if3<9 circle\n end if\n end if\n";
     let (rest, ast) = parser(content3).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
@@ -71,18 +71,15 @@ fn main() {
                 variables.insert(name, value);
             }
             Command::Instantiation(node) => nodes.push(node),
-            Command::ConditionalBlock(_) => (println!("bufu")),
-            Command::ListOfCommands(_) => (println!("bufu2")),
+            Command::ConditionalBlock(_) => (),
         }
     }
     // assert_eq!(*variables.get("x").unwrap(), 1.0);
     // assert_eq!(*variables.get("y").unwrap(), 2.0);
     // assert_eq!(*variables.get("z").unwrap(), 6.0);
-    //assert_eq!(rest, "");
+    // assert_eq!(rest, "");
     dbg!(rest);
 }
 
 // BUGS TO SOLVE
 // true || false are parsed as variables
-// after the then branch we have to put "\n" or the parser will fail
-// after the else branch we have to put "\n" or the parser will fail

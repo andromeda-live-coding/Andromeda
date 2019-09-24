@@ -2,12 +2,14 @@ use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, multispace0, one_of, space0};
 use nom::combinator::{map, opt};
+use nom::error::ErrorKind;
 use nom::error::VerboseError as Error;
+use nom::error::VerboseErrorKind;
 use nom::multi::{fold_many0, many0, many_m_n};
 use nom::number::complete::float;
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
+use nom::Err;
 use nom::IResult;
-
 use std::ops::{Add, Div, Mul, Sub};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -90,7 +92,6 @@ pub enum Command {
     Declaration((String, Operation)),
     Instantiation(Node),
     ConditionalBlock(Vec<(ConditionalBuiltin, Operation, Vec<Command>)>),
-    ListOfCommands(Vec<Command>),
 }
 
 pub fn variable(input: &str) -> IResult<&str, Factor, Error<&str>> {
@@ -207,20 +208,21 @@ pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
         tuple((
             tag("if"),
             boolean_expr,
-            many0(alt((draw_shape, assignment))),
+            many0(alt((command_if, draw_shape, assignment))),
             many0(tuple((
                 tag("else if"),
                 boolean_expr,
-                many0(alt((draw_shape, assignment))),
+                many0(alt((command_if, draw_shape, assignment))),
             ))),
             opt(tuple((
                 tag("else"),
                 multispace0,
-                many0(alt((draw_shape, assignment))),
+                many0(alt((command_if, draw_shape, assignment))),
             ))),
             tag("end if"),
+            multispace0,
         )),
-        |(_, pred, then_branch, multiple_elif, maybe_else_branch, _)| {
+        |(_, pred, then_branch, multiple_elif, maybe_else_branch, _, _)| {
             if multiple_elif.len() > 0 {
                 if let Some((_, _, cmd)) = maybe_else_branch {
                     let mut my_vec: Vec<(ConditionalBuiltin, Operation, Vec<Command>)> = Vec::new();
@@ -572,23 +574,32 @@ mod tests {
 
     #[test]
     fn if_command() {
-        // to test
-        let content = "if x = 1 and (y >= x or x > 3) square \n end if";
-        let content2 = "if x = 1 circle \n end if";
-        let (rest, ast) = command_if(content2).unwrap();
-        assert_eq!(rest, "");
-        //     let vector = vec![Command::Instantiation(Node::Square((
-        //         Operation::Identity(Factor::Number(1.0)),
-        //         Operation::Identity(Factor::Number(1.0)),
-        //     )))];
+        let content = "if x = 1 and (y >= x or x > 3) circle \n end if";
+        let (rest, ast) = command_if(content).unwrap();
         assert_eq!(
             ast,
             Command::ConditionalBlock(vec![(
                 ConditionalBuiltin::IfB,
                 Operation::Condition((
-                    Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
-                    Builtin::Equal,
-                    Box::new(Operation::Identity(Factor::Number(1.0)))
+                    Box::new(Operation::Condition((
+                        Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
+                        Builtin::Equal,
+                        Box::new(Operation::Identity(Factor::Number(1.0)))
+                    ))),
+                    Builtin::And,
+                    Box::new(Operation::Condition((
+                        Box::new(Operation::Condition((
+                            Box::new(Operation::Identity(Factor::Variable("y".to_string()))),
+                            Builtin::GreaterOrEqual,
+                            Box::new(Operation::Identity(Factor::Variable("x".to_string())))
+                        ))),
+                        Builtin::Or,
+                        Box::new(Operation::Condition((
+                            Box::new(Operation::Identity(Factor::Variable("x".to_string()))),
+                            Builtin::Greater,
+                            Box::new(Operation::Identity(Factor::Number(3.0)))
+                        )))
+                    )))
                 )),
                 vec![Command::Instantiation(Node::Circle(Operation::Identity(
                     Factor::Number(1.0)
