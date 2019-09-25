@@ -76,9 +76,18 @@ fn main() {
             Command::Instantiation(node) => nodes.push(node),
             Command::ConditionalBlock(l) => {
                 for (x, y, z) in l {
-                    unimplemented!();
+                    match x {
+                        ConditionalBuiltin::IfB => match y {
+                            Operation::Condition((v, b, n)) => {
+                                println!("hallo");
+                            }
+                            _ => unimplemented!(),
+                        },
+                        ConditionalBuiltin::ElseIfB => {}
+                        ConditionalBuiltin::ElseB => {}
+                    }
                 }
-            },
+            }
         }
     }
     // assert_eq!(*variables.get("x").unwrap(), 1.0);
