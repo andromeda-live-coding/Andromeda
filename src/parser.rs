@@ -607,18 +607,4 @@ mod tests {
             )])
         );
     }
-
-    #[test]
-    fn tt() {
-        use nom::combinator::not;
-        let c: IResult<&str, &str> = alpha1("bufu");
-        let parser = not(alt((tag("true"), tag("false"))));
-        assert_eq!(parser("123"), Ok(("123", ())));
-        assert_eq!(parser("123"), Ok(("123", ())));
-        assert_eq!(parser("abcd"), Err(Err::Error(("abcd", ErrorKind::Not))));
-    }
-
-    #[test]
-    fn if_tt() {
-    }
 }

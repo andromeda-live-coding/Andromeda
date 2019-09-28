@@ -242,7 +242,7 @@ fn declare_variable(
 
 fn main() {
     let content =
-        "x: 23 \n if (2>=3 or false) or false circle\n else if 1>2 square\n else square 12.6 3.1\n end if\n";
+        "x: 23 \n if (2>=3 or true) or false and (2*7 > 12) circle\n else if 1>2 square\n else square 12.6 3.1\n end if\n";
     let (rest, ast) = parser(content).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
@@ -343,13 +343,9 @@ fn main() {
             }
         }
     }
-    // assert_eq!(*variables.get("x").unwrap(), 1.0);
-    // assert_eq!(*variables.get("y").unwrap(), 2.0);
-    // assert_eq!(*variables.get("z").unwrap(), 6.0);
-    // assert_eq!(rest, "");
     dbg!(rest);
     dbg!(nodes);
 }
 
 // BUGS TO SOLVE
-// true || false are parsed as variables
+// true || false are parsed as variables so the command **true: 71.7** will be parsed
