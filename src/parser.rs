@@ -1,7 +1,7 @@
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{alpha1, char, multispace0, one_of, space0};
-use nom::combinator::{map, opt};
+use nom::combinator::{map, not, opt};
 use nom::error::ErrorKind;
 use nom::error::VerboseError as Error;
 use nom::error::VerboseErrorKind;
@@ -606,5 +606,19 @@ mod tests {
                 )))]
             )])
         );
+    }
+
+    #[test]
+    fn tt() {
+        use nom::combinator::not;
+        let c: IResult<&str, &str> = alpha1("bufu");
+        let parser = not(alt((tag("true"), tag("false"))));
+        assert_eq!(parser("123"), Ok(("123", ())));
+        assert_eq!(parser("123"), Ok(("123", ())));
+        assert_eq!(parser("abcd"), Err(Err::Error(("abcd", ErrorKind::Not))));
+    }
+
+    #[test]
+    fn if_tt() {
     }
 }
