@@ -1,16 +1,14 @@
 use nom::branch::alt;
 use nom::bytes::complete::tag;
-use nom::character::complete::{alpha1, char, multispace0, one_of, space0};
-use nom::combinator::{map, not, opt};
-use nom::error::ErrorKind;
+use nom::character::complete::{alpha1, char, digit1, multispace0, one_of, space0};
+use nom::combinator::{map, opt};
 use nom::error::VerboseError as Error;
-use nom::error::VerboseErrorKind;
 use nom::multi::{fold_many0, many0, many_m_n};
 use nom::number::complete::float;
 use nom::sequence::{delimited, pair, preceded, terminated, tuple};
-use nom::Err;
 use nom::IResult;
 use std::ops::{Add, Div, Mul, Sub};
+use std::str::FromStr;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Builtin {
@@ -42,22 +40,6 @@ pub enum Operation {
     Nil,
 }
 
-impl Mul for Operation {
-    type Output = Self;
-
-    fn mul(self, rhs: Self) -> Self {
-        Operation::Calculation((Box::new(self), Builtin::Mult, Box::new(rhs)))
-    }
-}
-
-impl Div for Operation {
-    type Output = Self;
-
-    fn div(self, rhs: Self) -> Self {
-        Operation::Calculation((Box::new(self), Builtin::Div, Box::new(rhs)))
-    }
-}
-
 impl Add for Operation {
     type Output = Self;
 
@@ -71,6 +53,22 @@ impl Sub for Operation {
 
     fn sub(self, rhs: Self) -> Self {
         Operation::Calculation((Box::new(self), Builtin::Minus, Box::new(rhs)))
+    }
+}
+
+impl Mul for Operation {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self {
+        Operation::Calculation((Box::new(self), Builtin::Mult, Box::new(rhs)))
+    }
+}
+
+impl Div for Operation {
+    type Output = Self;
+
+    fn div(self, rhs: Self) -> Self {
+        Operation::Calculation((Box::new(self), Builtin::Div, Box::new(rhs)))
     }
 }
 
@@ -92,14 +90,15 @@ pub enum Command {
     Declaration((String, Operation)),
     Instantiation(Node),
     ConditionalBlock(Vec<(ConditionalBuiltin, Operation, Vec<Command>)>),
-}
-
-pub fn variable(input: &str) -> IResult<&str, Factor, Error<&str>> {
-    map(alpha1, |v: &str| Factor::Variable(v.to_string()))(input)
+    For((i32, Vec<Command>)),
 }
 
 pub fn number(input: &str) -> IResult<&str, Factor, Error<&str>> {
     map(float, |value: f32| Factor::Number(value))(input)
+}
+
+pub fn variable(input: &str) -> IResult<&str, Factor, Error<&str>> {
+    map(alpha1, |v: &str| Factor::Variable(v.to_string()))(input)
 }
 
 pub fn mult(input: &str) -> IResult<&str, Builtin, Error<&str>> {
@@ -208,16 +207,16 @@ pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
         tuple((
             tag("if"),
             boolean_expr,
-            many0(alt((command_if, draw_shape, assignment))),
+            many0(alt((command_for, command_if, draw_shape, assignment))),
             many0(tuple((
                 tag("else if"),
                 boolean_expr,
-                many0(alt((command_if, draw_shape, assignment))),
+                many0(alt((command_for, command_if, draw_shape, assignment))),
             ))),
             opt(tuple((
                 tag("else"),
                 multispace0,
-                many0(alt((command_if, draw_shape, assignment))),
+                many0(alt((command_for, command_if, draw_shape, assignment))),
             ))),
             tag("end if"),
             multispace0,
@@ -241,45 +240,23 @@ pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
                             _ => unimplemented!(),
                         }
                     }
-                    // TODOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
                     my_vec.push((ConditionalBuiltin::ElseB, Operation::Nil, cmd));
                     Command::ConditionalBlock(my_vec)
                 } else {
-                    unimplemented!(); // else if ** no else ____ ERROR ERROR ERROR
+                    unimplemented!(); // else if ** no else ____ERROR
                 }
             } else {
                 let mut my_vec: Vec<(ConditionalBuiltin, Operation, Vec<Command>)> = Vec::new();
                 if let Some((_, _, cmd)) = maybe_else_branch {
-                    // TODOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO
-                    // no else if ** else   DONE
                     my_vec.push((ConditionalBuiltin::IfB, pred, then_branch));
                     my_vec.push((ConditionalBuiltin::ElseB, Operation::Nil, cmd));
                 } else {
-                    // no else if ** no else DONE
                     my_vec.push((ConditionalBuiltin::IfB, pred, then_branch));
                 }
                 Command::ConditionalBlock(my_vec)
             }
         },
     )(input)
-}
-
-pub fn boolean_expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
-    let (rest, init) = boolean_term(input)?;
-
-    fold_many0(
-        pair(
-            map(delimited(multispace0, tag("or"), multispace0), |_| {
-                Builtin::Or
-            }),
-            boolean_term,
-        ),
-        init,
-        |acc, (op, val): (Builtin, Operation)| match op {
-            Builtin::Or => Operation::Condition((Box::new(acc), Builtin::Or, Box::new(val))),
-            _ => unimplemented!(),
-        },
-    )(rest)
 }
 
 pub fn condition(input: &str) -> IResult<&str, Operation, Error<&str>> {
@@ -333,9 +310,46 @@ fn boolean_term(input: &str) -> IResult<&str, Operation, Error<&str>> {
     )(rest)
 }
 
+pub fn boolean_expr(input: &str) -> IResult<&str, Operation, Error<&str>> {
+    let (rest, init) = boolean_term(input)?;
+
+    fold_many0(
+        pair(
+            map(delimited(multispace0, tag("or"), multispace0), |_| {
+                Builtin::Or
+            }),
+            boolean_term,
+        ),
+        init,
+        |acc, (op, val): (Builtin, Operation)| match op {
+            Builtin::Or => Operation::Condition((Box::new(acc), Builtin::Or, Box::new(val))),
+            _ => unimplemented!(),
+        },
+    )(rest)
+}
+
+fn command_for(input: &str) -> IResult<&str, Command, Error<&str>> {
+    map(
+        tuple((
+            tag("for"),
+            multispace0,
+            digit1,
+            multispace0,
+            delimited(tag("{"), parser, tag("}")),
+            multispace0,
+        )),
+        |(_, _, times, _, v, _): (_, _, &str, _, Vec<Command>, _)| {
+            Command::For((FromStr::from_str(times).unwrap(), v))
+        },
+    )(input)
+}
+
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {
     many0(terminated(
-        preceded(multispace0, alt((command_if, draw_shape, assignment))),
+        preceded(
+            multispace0,
+            alt((command_for, command_if, draw_shape, assignment)),
+        ),
         multispace0,
     ))(input)
 }

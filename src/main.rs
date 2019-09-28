@@ -229,6 +229,31 @@ fn eval_if(
     }
 }
 
+fn eval_for(times: i32, commands: Vec<Command>, variables: &HashMap<String, f32>) -> Vec<Node> {
+    let mut r: Vec<Node> = Vec::new();
+    for x in 0..times {
+        for l in commands.clone() {
+            match l {
+                Command::Instantiation(nd) => {
+                    r.push(nd);
+                }
+                Command::Declaration((name, value)) => {
+                    let (name, value) = declare_variable((name, value), &variables);
+                    //variables.insert(name, value);
+                }
+                Command::ConditionalBlock(cb) => {}
+                Command::For((times2, commands2)) => {
+                    let nodes = eval_for(times2, commands2, variables);
+                    for elem in nodes {
+                        r.push(elem);
+                    }
+                }
+            }
+        }
+    }
+    r
+}
+
 fn declare_variable(
     (name, value): (String, Operation),
     variables: &HashMap<String, f32>,
@@ -241,8 +266,7 @@ fn declare_variable(
 }
 
 fn main() {
-    let content =
-        "x: 23 \n if (2>=3 or true) or false and (2*7 > 12) circle\n else if 1>2 square\n else square 12.6 3.1\n end if\n";
+    let content = "for 2 {for 2 {square\n} }";
     let (rest, ast) = parser(content).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
@@ -285,6 +309,10 @@ fn main() {
                                         match command {
                                             Command::Instantiation(node) => {
                                                 nodes.push(node);
+                                            }
+                                            // if if
+                                            Command::ConditionalBlock(_branches2) => {
+                                                // eval_conditional_block
                                             }
                                             _ => unimplemented!(),
                                         }
@@ -341,11 +369,22 @@ fn main() {
                     }
                 }
             }
+            // TODO
+            Command::For((times, commands)) => {
+                let c = eval_for(times, commands, &variables);
+                for elem in c {
+                    nodes.push(elem);
+                }
+            }
         }
     }
     dbg!(rest);
     dbg!(nodes);
 }
+// it parse
+// nested if // IF FOR // FOR IF // nested for //
+// but not evaluating
+// Vec<Command>
 
 // BUGS TO SOLVE
 // true || false are parsed as variables so the command **true: 71.7** will be parsed
