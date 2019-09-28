@@ -55,7 +55,7 @@ fn eval_if(
         ) => match op {
             Builtin::And => {
                 if eval_if(*left2, op2, *right2, variables)
-                    > eval_if(*left3, op3, *right3, variables)
+                    && eval_if(*left3, op3, *right3, variables)
                 {
                     true
                 } else {
@@ -76,7 +76,6 @@ fn eval_if(
         (Operation::Identity(val1), Operation::Identity(val2)) => match op {
             Builtin::Greater => {
                 if get_value(val1, variables) > get_value(val2, &variables) {
-                    println!("identity1 > identity2");
                     true
                 } else {
                     false
@@ -255,7 +254,7 @@ fn main() {
           circle  17.1 
           end if";
     let _content2 = "circle      \n x: 2\n if 2+x = 5\n square \n\n else circle\n  end if";
-    let content3 = "x: 23 \n if 24+x > 7 and true circle\n end if\n";
+    let content3 = "x: 23 \n if 3 > 2 circle\n else square\n end if\n";
     let (rest, ast) = parser(content3).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
@@ -268,25 +267,35 @@ fn main() {
             }
             Command::Instantiation(node) => nodes.push(node),
             Command::ConditionalBlock(branches) => {
+                let mut found = false;
+
                 for (branch, pred, commands) in branches {
+                    if found {
+                        break;
+                    }
                     match branch {
                         ConditionalBuiltin::IfB => match pred {
                             Operation::Identity(Factor::Boolean(true)) => {
-                                println!("condition true");
+                                found = true;
+                                // commands
                             }
                             Operation::Identity(Factor::Boolean(false)) => {
                                 println!("condition false")
                             }
-                            // condition
                             Operation::Condition((left, op, right)) => {
                                 if eval_if(*left, op, *right, &variables) {
-                                    println!("done bitch");
+                                    found = true;
+                                // commands
+                                } else {
+
                                 }
                             }
                             _ => unimplemented!(),
                         },
                         ConditionalBuiltin::ElseIfB => {}
-                        ConditionalBuiltin::ElseB => {}
+                        ConditionalBuiltin::ElseB => {
+                            println!("square");
+                        }
                     }
                 }
             }
