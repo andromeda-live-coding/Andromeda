@@ -241,21 +241,9 @@ fn declare_variable(
 }
 
 fn main() {
-    let _content = "x: 2\n
-        y: x\n
-        x: 1\n
-        z: ((x + (2 + 3)) * y) / 2\n
-        square z+x (19.1*2)\n
-        square\n 
-        circle\n
-        if 12.6 = x+ 19.91\n
-         square  19.2\n
-          else  
-          circle  17.1 
-          end if";
-    let _content2 = "circle      \n x: 2\n if 2+x = 5\n square \n\n else circle\n  end if";
-    let content3 = "x: 23 \n if 3 > 2 circle\n else square\n end if\n";
-    let (rest, ast) = parser(content3).unwrap();
+    let content =
+        "x: 23 \n if (2>=3 or false) or false circle\n else if 1>2 square\n else square 12.6 3.1\n end if\n";
+    let (rest, ast) = parser(content).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
     let mut nodes: Vec<Node> = vec![];
@@ -278,23 +266,77 @@ fn main() {
                             Operation::Identity(Factor::Boolean(true)) => {
                                 found = true;
                                 // commands
+                                for command in commands {
+                                    match command {
+                                        Command::Instantiation(node) => {
+                                            nodes.push(node);
+                                        }
+                                        _ => unimplemented!(),
+                                    }
+                                }
                             }
                             Operation::Identity(Factor::Boolean(false)) => {
-                                println!("condition false")
+                                // false condition
                             }
                             Operation::Condition((left, op, right)) => {
                                 if eval_if(*left, op, *right, &variables) {
                                     found = true;
-                                // commands
+                                    for command in commands {
+                                        match command {
+                                            Command::Instantiation(node) => {
+                                                nodes.push(node);
+                                            }
+                                            _ => unimplemented!(),
+                                        }
+                                    }
                                 } else {
 
                                 }
                             }
                             _ => unimplemented!(),
                         },
-                        ConditionalBuiltin::ElseIfB => {}
+                        ConditionalBuiltin::ElseIfB => match pred {
+                            Operation::Identity(Factor::Boolean(true)) => {
+                                found = true;
+                                // commands
+                                for command in commands {
+                                    match command {
+                                        Command::Instantiation(node) => {
+                                            nodes.push(node);
+                                        }
+                                        _ => unimplemented!(),
+                                    }
+                                }
+                            }
+                            Operation::Identity(Factor::Boolean(false)) => {
+                                // false condition
+                            }
+                            Operation::Condition((left, op, right)) => {
+                                if eval_if(*left, op, *right, &variables) {
+                                    found = true;
+                                    for command in commands {
+                                        match command {
+                                            Command::Instantiation(node) => {
+                                                nodes.push(node);
+                                            }
+                                            _ => unimplemented!(),
+                                        }
+                                    }
+                                } else {
+
+                                }
+                            }
+                            _ => unimplemented!(),
+                        },
                         ConditionalBuiltin::ElseB => {
-                            println!("square");
+                            for command in commands {
+                                match command {
+                                    Command::Instantiation(node) => {
+                                        nodes.push(node);
+                                    }
+                                    _ => unimplemented!(),
+                                }
+                            }
                         }
                     }
                 }
@@ -306,6 +348,7 @@ fn main() {
     // assert_eq!(*variables.get("z").unwrap(), 6.0);
     // assert_eq!(rest, "");
     dbg!(rest);
+    dbg!(nodes);
 }
 
 // BUGS TO SOLVE
