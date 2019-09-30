@@ -284,6 +284,7 @@ fn eval_conditional_block(
                                         nodes.push(elem);
                                     }
                                 }
+                                _ => unimplemented!(),
                             }
                         }
                     } else {
@@ -364,6 +365,7 @@ fn eval_for(times: i32, commands: Vec<Command>, variables: &HashMap<String, f32>
                         c.push(elem);
                     }
                 }
+                _ => unimplemented!(),
             }
         }
     }
@@ -383,37 +385,39 @@ fn declare_variable(
 
 // BUGS TO SOLVE
 // true || false are parsed as variables so the command **true: 71.7** will be parsed
+// it's not possible to **y: -x**
+//
 
 fn main() {
-    // let content =
-    //     "for 2 { if 5 > 0 for 2 { if 2 > 1 if 3>2 square 2\n end if  end if } end if    }";
-    // let (rest, ast) = parser(content).unwrap();
-    // dbg!(ast.clone());
-    // let mut variables: HashMap<String, f32> = HashMap::new();
-    // let mut nodes: Vec<Node> = vec![];
-    // for expression in ast {
-    //     match expression {
-    //         Command::Declaration(declaration) => {
-    //             let (name, value) = declare_variable(declaration, &variables);
-    //             variables.insert(name, value);
-    //         }
-    //         Command::Instantiation(node) => nodes.push(node),
-    //         Command::ConditionalBlock(branches) => {
-    //             let tmp = eval_conditional_block(branches, &variables);
-    //             for elem in tmp {
-    //                 nodes.push(elem);
-    //             }
-    //         }
-    //         Command::For((times, commands)) => {
-    //             let tmp = eval_for(times, commands, &variables);
-    //             for elem in tmp {
-    //                 nodes.push(elem);
-    //             }
-    //         }
-    //     }
-    // }
-    // dbg!(rest);
-    // dbg!(nodes);
+    let content = "x: 23\n y: -x";
+    let (rest, ast) = parser(content).unwrap();
+    dbg!(ast.clone());
+    let mut variables: HashMap<String, f32> = HashMap::new();
+    let mut nodes: Vec<Node> = vec![];
+    for expression in ast {
+        match expression {
+            Command::Declaration(declaration) => {
+                let (name, value) = declare_variable(declaration, &variables);
+                variables.insert(name, value);
+            }
+            Command::Instantiation(node) => nodes.push(node),
+            Command::ConditionalBlock(branches) => {
+                let tmp = eval_conditional_block(branches, &variables);
+                for elem in tmp {
+                    nodes.push(elem);
+                }
+            }
+            Command::For((times, commands)) => {
+                let tmp = eval_for(times, commands, &variables);
+                for elem in tmp {
+                    nodes.push(elem);
+                }
+            }
+            _ => unimplemented!(),
+        }
+    }
+    dbg!(rest);
+    dbg!(nodes);
     nannou::app(model)
         .event(event)
         .update(update)
@@ -496,11 +500,11 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 fn view(app: &App, model: &Model, frame: &Frame) {
     let mut variables: HashMap<String, f32> = HashMap::new();
     let draw = app.draw();
-    let position: (f32, f32) = (0.0, 0.0);
-    let std_value = 10.0;
+    let mut position: (f32, f32) = (0.0, 0.0);
+    let _std_value = 10.0;
     draw.background().rgb(0.39, 0.39, 0.39);
     let color = rgb(1.0, 1.0, 1.0);
-    for x in &model.instructions {
+    for x in model.instructions.clone() {
         match x {
             Command::Declaration((name, value)) => {
                 let (name, value) = declare_variable((name.to_string(), value.clone()), &variables);
@@ -508,12 +512,18 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             }
             Command::Instantiation(nd) => match nd {
                 Node::Circle(v) => match v {
-                    Operation::Calculation((l, op, r)) => {}
+                    Operation::Calculation((l, op, r)) => {
+                        let a = eval(*l, op, *r, &variables);
+                        draw.ellipse()
+                            .x_y(position.0, position.1)
+                            .w_h(a, a)
+                            .color(color);
+                    }
                     Operation::Identity(f) => match f {
                         Factor::Number(val) => {
                             draw.ellipse()
                                 .x_y(position.0, position.1)
-                                .w_h(*val, *val)
+                                .w_h(val, val)
                                 .color(color);
                         }
                         Factor::Variable(var_name) => {
@@ -529,15 +539,69 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                     },
                     _ => unimplemented!(),
                 },
-                Node::Square((w, x)) => {
-                    // Operation ???????????????????????????????????????????
-                    //draw.quad().x_y(x, y).w_h(100.0, 100.0);
-                    //.color(color.0, color.1, color.2);
+                Node::Square((width, height)) => {
+                    let width = match width {
+                        Operation::Calculation((l, op, right)) => eval(*l, op, *right, &variables),
+                        Operation::Identity(l) => match l {
+                            Factor::Number(value) => value,
+                            Factor::Variable(var) => get_value(Factor::Variable(var), &variables),
+                            _ => unimplemented!(),
+                        },
+                        _ => unimplemented!(),
+                    };
+
+                    let height = match height {
+                        Operation::Calculation((l, op, right)) => eval(*l, op, *right, &variables),
+                        Operation::Identity(l) => match l {
+                            Factor::Number(value) => value,
+                            Factor::Variable(var) => get_value(Factor::Variable(var), &variables),
+                            _ => unimplemented!(),
+                        },
+                        _ => unimplemented!(),
+                    };
+
+                    draw.quad()
+                        .x_y(position.0, position.1)
+                        .w_h(width, height)
+                        .color(color);
                 }
             },
-
-            // f32 values must arrive, so we have to convert strings on the parser side
-            _ => unimplemented!(),
+            Command::ConditionalBlock(branches) => {
+                let tmp = eval_conditional_block(branches, &variables);
+                for elem in tmp {
+                    //nodes.push(elem);
+                }
+            }
+            Command::For((times, commands)) => {
+                let tmp = eval_for(times, commands, &variables);
+                for elem in tmp {
+                    //nodes.push(elem);
+                }
+            }
+            Command::Move((x, y)) => {
+                position.0 = match x {
+                    Operation::Calculation((l, op, right)) => eval(*l, op, *right, &variables),
+                    Operation::Identity(l) => match l {
+                        Factor::Number(value) => value,
+                        Factor::Variable(var) => get_value(Factor::Variable(var), &variables),
+                        _ => unimplemented!(),
+                    },
+                    _ => unimplemented!(),
+                };
+                position.1 = match y {
+                    Operation::Calculation((l, op, right)) => eval(*l, op, *right, &variables),
+                    Operation::Identity(l) => match l {
+                        Factor::Number(value) => value,
+                        Factor::Variable(var) => get_value(Factor::Variable(var), &variables),
+                        _ => unimplemented!(),
+                    },
+                    _ => unimplemented!(),
+                };
+            }
+            Command::ResetMove => {
+                position.0 = 0.0;
+                position.1 = 0.0;
+            }
         }
     }
     // Write the result of our drawing to the window's frame.
@@ -556,34 +620,7 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                 if let Ok((remaining, ast)) = parser::parser(&model.text_edit) {
                     println!("{:#?}", parser::parser(&model.text_edit));
                     if remaining == "" {
-                        let mut variables: HashMap<String, f32> = HashMap::new();
-                        let mut nodes: Vec<Node> = vec![];
-                        let mut semantic_analysis = true;
-                        for x in ast.to_owned() {
-                            match x {
-                                Command::Declaration(declaration) => {
-                                    let (name, value) = declare_variable(declaration, &variables);
-                                    variables.insert(name, value);
-                                }
-                                Command::Instantiation(node) => nodes.push(node),
-                                Command::ConditionalBlock(branches) => {
-                                    let tmp = eval_conditional_block(branches, &variables);
-                                    for elem in tmp {
-                                        nodes.push(elem);
-                                    }
-                                }
-                                Command::For((times, commands)) => {
-                                    let tmp = eval_for(times, commands, &variables);
-                                    for elem in tmp {
-                                        nodes.push(elem);
-                                    }
-                                }
-                            }
-                        }
-                        // updating AST only if parser success and there isn't nothing left to parse
-                        if semantic_analysis {
-                            model.instructions = ast;
-                        }
+                        model.instructions = ast;
                     } else {
                         println!("{}", "CAN'T UPDATE ABSTRACT SYNTAX TREE".red().bold());
                         println!("{:#?}", parser::parser(&model.text_edit));

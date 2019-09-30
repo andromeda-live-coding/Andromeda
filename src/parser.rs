@@ -91,6 +91,8 @@ pub enum Command {
     Instantiation(Node),
     ConditionalBlock(Vec<(ConditionalBuiltin, Operation, Vec<Command>)>),
     For((i32, Vec<Command>)),
+    Move((Operation, Operation)),
+    ResetMove,
 }
 
 pub fn number(input: &str) -> IResult<&str, Factor, Error<&str>> {
@@ -344,11 +346,31 @@ fn command_for(input: &str) -> IResult<&str, Command, Error<&str>> {
     )(input)
 }
 
+fn command_move(input: &str) -> IResult<&str, Command, Error<&str>> {
+    map(
+        tuple((tag("move"), multispace0, expr, tag(","), multispace0, expr)),
+        |(_, _, val1, _, _, val2)| Command::Move((val1, val2)),
+    )(input)
+}
+
+fn command_reset_move(input: &str) -> IResult<&str, Command, Error<&str>> {
+    map(delimited(multispace0, tag("reset_m"), multispace0), |_| {
+        Command::ResetMove
+    })(input)
+}
+
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {
     many0(terminated(
         preceded(
             multispace0,
-            alt((command_for, command_if, draw_shape, assignment)),
+            alt((
+                command_reset_move,
+                command_move,
+                command_for,
+                command_if,
+                draw_shape,
+                assignment,
+            )),
         ),
         multispace0,
     ))(input)
