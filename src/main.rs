@@ -385,35 +385,35 @@ fn declare_variable(
 // true || false are parsed as variables so the command **true: 71.7** will be parsed
 
 fn main() {
-    let content =
-        "for 2 { if 5 > 0 for 2 { if 2 > 1 if 3>2 square 2\n end if  end if } end if    }";
-    let (rest, ast) = parser(content).unwrap();
-    dbg!(ast.clone());
-    let mut variables: HashMap<String, f32> = HashMap::new();
-    let mut nodes: Vec<Node> = vec![];
-    for expression in ast {
-        match expression {
-            Command::Declaration(declaration) => {
-                let (name, value) = declare_variable(declaration, &variables);
-                variables.insert(name, value);
-            }
-            Command::Instantiation(node) => nodes.push(node),
-            Command::ConditionalBlock(branches) => {
-                let tmp = eval_conditional_block(branches, &variables);
-                for elem in tmp {
-                    nodes.push(elem);
-                }
-            }
-            Command::For((times, commands)) => {
-                let tmp = eval_for(times, commands, &variables);
-                for elem in tmp {
-                    nodes.push(elem);
-                }
-            }
-        }
-    }
-    dbg!(rest);
-    dbg!(nodes);
+    // let content =
+    //     "for 2 { if 5 > 0 for 2 { if 2 > 1 if 3>2 square 2\n end if  end if } end if    }";
+    // let (rest, ast) = parser(content).unwrap();
+    // dbg!(ast.clone());
+    // let mut variables: HashMap<String, f32> = HashMap::new();
+    // let mut nodes: Vec<Node> = vec![];
+    // for expression in ast {
+    //     match expression {
+    //         Command::Declaration(declaration) => {
+    //             let (name, value) = declare_variable(declaration, &variables);
+    //             variables.insert(name, value);
+    //         }
+    //         Command::Instantiation(node) => nodes.push(node),
+    //         Command::ConditionalBlock(branches) => {
+    //             let tmp = eval_conditional_block(branches, &variables);
+    //             for elem in tmp {
+    //                 nodes.push(elem);
+    //             }
+    //         }
+    //         Command::For((times, commands)) => {
+    //             let tmp = eval_for(times, commands, &variables);
+    //             for elem in tmp {
+    //                 nodes.push(elem);
+    //             }
+    //         }
+    //     }
+    // }
+    // dbg!(rest);
+    // dbg!(nodes);
     nannou::app(model)
         .event(event)
         .update(update)
@@ -436,7 +436,7 @@ struct Ids {
 fn model(app: &App) -> Model {
     app.set_loop_mode(LoopMode::wait(3));
     app.new_window()
-        .with_dimensions(720, 720)
+        .with_dimensions(1280, 1024)
         .event(window_event)
         .raw_event(raw_window_event)
         .key_pressed(key_pressed)
@@ -499,50 +499,33 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     let std_value = 10.0;
     draw.background().rgb(0.39, 0.39, 0.39);
     let color = rgb(1.0, 1.0, 1.0);
-    // for x in &model.instructions {
-    //     match x {
-    //         Command::DeclareVariable((_, _)) => {}
-    //         Command::DrawShape(shape) => {
-    //             draw_shape(
-    //                 &draw,
-    //                 shape.as_ref(),
-    //                 position.0,
-    //                 position.1,
-    //                 std_value,
-    //                 std_value,
-    //                 (color.red, color.green, color.blue),
-    //             );
-    //         }
+    for x in &model.instructions {
+        match x {
+            Command::Declaration((_, _)) => {}
+            Command::Instantiation(nd) => match nd {
+                Node::Circle(v) => {}
+                Node::Square(w) => {
+                    draw.quad().x_y(100.0, 100.0).w_h(100.0, 100.0);
+                    //.color(color.0, color.1, color.2);
+                }
+            },
 
-    //         // f32 values must arrive, so we have to convert strings on the parser side
-    //         Command::DrawShapeWf32((shape, val1, val2)) => {
-    //             draw_shape(
-    //                 &draw,
-    //                 shape.as_ref(),
-    //                 position.0,
-    //                 position.1,
-    //                 *val1,
-    //                 *val2,
-    //                 (color.red, color.green, color.blue),
-    //             );
-    //         }
-    //     }
-    // }
+            // f32 values must arrive, so we have to convert strings on the parser side
+            _ => unimplemented!(),
+        }
+    }
     // Write the result of our drawing to the window's frame.
     draw.to_frame(app, &frame).unwrap();
 
     // Draw the state of the `Ui` to the frame.
     model.ui.draw_to_frame(app, &frame).unwrap();
 
-    // fn draw_shape(
-    //     c: &Draw,
-    //     shape: &str,
-    //     x: f32,
-    //     y: f32,
-    //     val1: f32,
-    //     val2: f32,
-    //     color: (f32, f32, f32),
-    // ) {
+    // fn d_s(
+    //     c: &Draw, s: &str, x: f32, y: f32,
+    //     v: f32,
+    //     vw: f32,
+    //     rgb: (f32, f32, f32),
+    // ) -> {
     //     match shape {
     //         "box" => {
     //             c.quad()
@@ -573,6 +556,12 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                         let mut semantic_analysis = true;
                         for x in ast.to_owned() {
                             match x {
+                                Command::Instantiation(nd) => {
+                                    model.instructions.push(Command::Instantiation(nd))
+                                }
+                                Command::Declaration(nd) => {
+                                    model.instructions.push(Command::Declaration(nd))
+                                }
                                 _ => unimplemented!(),
                             }
                         }
