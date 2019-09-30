@@ -494,6 +494,7 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 }
 
 fn view(app: &App, model: &Model, frame: &Frame) {
+    let mut variables: HashMap<String, f32> = HashMap::new();
     let draw = app.draw();
     let position: (f32, f32) = (0.0, 0.0);
     let std_value = 10.0;
@@ -501,10 +502,34 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     let color = rgb(1.0, 1.0, 1.0);
     for x in &model.instructions {
         match x {
-            Command::Declaration((_, _)) => {}
+            Command::Declaration((name, value)) => {
+                let (name, value) = declare_variable((name.to_string(), value.clone()), &variables);
+                variables.insert(name, value);
+            }
             Command::Instantiation(nd) => match nd {
-                Node::Circle(v) => {}
-                Node::Square(w) => {
+                Node::Circle(v) => match v {
+                    Operation::Calculation((l, op, r)) => {}
+                    Operation::Identity(f) => match f {
+                        Factor::Number(val) => {
+                            draw.ellipse()
+                                .x_y(position.0, position.1)
+                                .w_h(*val, *val)
+                                .color(color);
+                        }
+                        Factor::Variable(var_name) => {
+                            draw.ellipse()
+                                .x_y(position.0, position.1)
+                                .w_h(
+                                    get_value(Factor::Variable(var_name.to_string()), &variables),
+                                    get_value(Factor::Variable(var_name.to_string()), &variables),
+                                )
+                                .color(color);
+                        }
+                        Factor::Boolean(_) => unimplemented!(),
+                    },
+                    _ => unimplemented!(),
+                },
+                Node::Square((w, x)) => {
                     // Operation ???????????????????????????????????????????
                     //draw.quad().x_y(x, y).w_h(100.0, 100.0);
                     //.color(color.0, color.1, color.2);
