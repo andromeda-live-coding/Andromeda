@@ -29,7 +29,7 @@ fn eval(first: Operation, op: Builtin, second: Operation, variables: &HashMap<St
     }
 }
 
-fn eval_if(
+fn eval_boolean_expr(
     first: Operation,
     op: Builtin,
     second: Operation,
@@ -54,8 +54,8 @@ fn eval_if(
             Operation::Condition((left3, op3, right3)),
         ) => match op {
             Builtin::And => {
-                if eval_if(*left2, op2, *right2, variables)
-                    && eval_if(*left3, op3, *right3, variables)
+                if eval_boolean_expr(*left2, op2, *right2, variables)
+                    && eval_boolean_expr(*left3, op3, *right3, variables)
                 {
                     true
                 } else {
@@ -63,8 +63,8 @@ fn eval_if(
                 }
             }
             Builtin::Or => {
-                if eval_if(*left2, op2, *right2, variables)
-                    || eval_if(*left3, op3, *right3, variables)
+                if eval_boolean_expr(*left2, op2, *right2, variables)
+                    || eval_boolean_expr(*left3, op3, *right3, variables)
                 {
                     true
                 } else {
@@ -190,14 +190,14 @@ fn eval_if(
         (Operation::Condition((left2, op2, right2)), Operation::Identity(Factor::Boolean(val))) => {
             match op {
                 Builtin::And => {
-                    if eval_if(*left2, op2, *right2, &variables) && val {
+                    if eval_boolean_expr(*left2, op2, *right2, &variables) && val {
                         true
                     } else {
                         false
                     }
                 }
                 Builtin::Or => {
-                    if eval_if(*left2, op2, *right2, &variables) || val {
+                    if eval_boolean_expr(*left2, op2, *right2, &variables) || val {
                         true
                     } else {
                         false
@@ -209,14 +209,14 @@ fn eval_if(
         (Operation::Identity(Factor::Boolean(val)), Operation::Condition((left2, op2, right2))) => {
             match op {
                 Builtin::And => {
-                    if val && eval_if(*left2, op2, *right2, &variables) {
+                    if val && eval_boolean_expr(*left2, op2, *right2, &variables) {
                         true
                     } else {
                         false
                     }
                 }
                 Builtin::Or => {
-                    if val || eval_if(*left2, op2, *right2, &variables) {
+                    if val || eval_boolean_expr(*left2, op2, *right2, &variables) {
                         true
                     } else {
                         false
@@ -229,29 +229,141 @@ fn eval_if(
     }
 }
 
-fn eval_for(times: i32, commands: Vec<Command>, variables: &HashMap<String, f32>) -> Vec<Node> {
-    let mut r: Vec<Node> = Vec::new();
-    for x in 0..times {
-        for l in commands.clone() {
-            match l {
-                Command::Instantiation(nd) => {
-                    r.push(nd);
+fn eval_conditional_block(
+    branches: Vec<(ConditionalBuiltin, Operation, Vec<Command>)>,
+    variables: &HashMap<String, f32>,
+) -> Vec<Node> {
+    let mut nodes: Vec<Node> = Vec::new();
+    let mut found = false;
+
+    for (branch, pred, commands) in branches {
+        if found {
+            break;
+        }
+        match branch {
+            ConditionalBuiltin::IfB => match pred {
+                Operation::Identity(Factor::Boolean(true)) => {
+                    found = true;
+                    // commands
+                    for command in commands {
+                        match command {
+                            Command::Instantiation(node) => {
+                                nodes.push(node);
+                            }
+                            _ => unimplemented!(),
+                        }
+                    }
                 }
-                Command::Declaration((name, value)) => {
-                    let (name, value) = declare_variable((name, value), &variables);
-                    //variables.insert(name, value);
+                Operation::Identity(Factor::Boolean(false)) => {
+                    // false condition
                 }
-                Command::ConditionalBlock(cb) => {}
-                Command::For((times2, commands2)) => {
-                    let nodes = eval_for(times2, commands2, variables);
-                    for elem in nodes {
-                        r.push(elem);
+                Operation::Condition((left, op, right)) => {
+                    if eval_boolean_expr(*left, op, *right, &variables) {
+                        found = true;
+                        for command in commands {
+                            match command {
+                                Command::Declaration(_) => unimplemented!(),
+                                Command::Instantiation(node) => {
+                                    nodes.push(node);
+                                }
+                                // if if
+                                Command::ConditionalBlock(branches2) => {
+                                    // eval_conditional_block
+                                    let c = eval_conditional_block(branches2, &variables);
+                                    for elem in c {
+                                        nodes.push(elem);
+                                    }
+                                }
+                                Command::For((n, cmds)) => {
+                                    let c = eval_for(n, cmds, &variables);
+                                    for elem in c {
+                                        nodes.push(elem);
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+
+                    }
+                }
+                _ => unimplemented!(),
+            },
+            ConditionalBuiltin::ElseIfB => match pred {
+                Operation::Identity(Factor::Boolean(true)) => {
+                    found = true;
+                    // commands
+                    for command in commands {
+                        match command {
+                            Command::Instantiation(node) => {
+                                nodes.push(node);
+                            }
+                            _ => unimplemented!(),
+                        }
+                    }
+                }
+                Operation::Identity(Factor::Boolean(false)) => {
+                    // false condition
+                }
+                Operation::Condition((left, op, right)) => {
+                    if eval_boolean_expr(*left, op, *right, &variables) {
+                        found = true;
+                        for command in commands {
+                            match command {
+                                Command::Instantiation(node) => {
+                                    nodes.push(node);
+                                }
+                                _ => unimplemented!(),
+                            }
+                        }
+                    } else {
+                    }
+                }
+                _ => unimplemented!(),
+            },
+            ConditionalBuiltin::ElseB => {
+                for command in commands {
+                    match command {
+                        Command::Instantiation(node) => {
+                            nodes.push(node);
+                        }
+                        _ => unimplemented!(),
                     }
                 }
             }
         }
     }
-    r
+    nodes
+}
+
+fn eval_for(times: i32, commands: Vec<Command>, variables: &HashMap<String, f32>) -> Vec<Node> {
+    let mut v: HashMap<String, f32> = HashMap::new();
+    let mut c: Vec<Node> = Vec::new();
+    for x in 0..times {
+        for l in commands.clone() {
+            match l {
+                Command::Instantiation(nd) => {
+                    c.push(nd);
+                }
+                Command::Declaration((name, value)) => {
+                    let (name, value) = declare_variable((name, value), &variables);
+                    v.insert(name, value);
+                }
+                Command::ConditionalBlock(cb) => {
+                    let nodes = eval_conditional_block(cb, &variables);
+                    for elem in nodes {
+                        c.push(elem);
+                    }
+                }
+                Command::For((times, commands)) => {
+                    let nodes = eval_for(times, commands, variables);
+                    for elem in nodes {
+                        c.push(elem);
+                    }
+                }
+            }
+        }
+    }
+    c
 }
 
 fn declare_variable(
@@ -266,7 +378,7 @@ fn declare_variable(
 }
 
 fn main() {
-    let content = "for 2 {for 2 {square\n} }";
+    let content = "for 2 { if 1 > 1 square 2\n  end if }";
     let (rest, ast) = parser(content).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
@@ -279,100 +391,14 @@ fn main() {
             }
             Command::Instantiation(node) => nodes.push(node),
             Command::ConditionalBlock(branches) => {
-                let mut found = false;
-
-                for (branch, pred, commands) in branches {
-                    if found {
-                        break;
-                    }
-                    match branch {
-                        ConditionalBuiltin::IfB => match pred {
-                            Operation::Identity(Factor::Boolean(true)) => {
-                                found = true;
-                                // commands
-                                for command in commands {
-                                    match command {
-                                        Command::Instantiation(node) => {
-                                            nodes.push(node);
-                                        }
-                                        _ => unimplemented!(),
-                                    }
-                                }
-                            }
-                            Operation::Identity(Factor::Boolean(false)) => {
-                                // false condition
-                            }
-                            Operation::Condition((left, op, right)) => {
-                                if eval_if(*left, op, *right, &variables) {
-                                    found = true;
-                                    for command in commands {
-                                        match command {
-                                            Command::Instantiation(node) => {
-                                                nodes.push(node);
-                                            }
-                                            // if if
-                                            Command::ConditionalBlock(_branches2) => {
-                                                // eval_conditional_block
-                                            }
-                                            _ => unimplemented!(),
-                                        }
-                                    }
-                                } else {
-
-                                }
-                            }
-                            _ => unimplemented!(),
-                        },
-                        ConditionalBuiltin::ElseIfB => match pred {
-                            Operation::Identity(Factor::Boolean(true)) => {
-                                found = true;
-                                // commands
-                                for command in commands {
-                                    match command {
-                                        Command::Instantiation(node) => {
-                                            nodes.push(node);
-                                        }
-                                        _ => unimplemented!(),
-                                    }
-                                }
-                            }
-                            Operation::Identity(Factor::Boolean(false)) => {
-                                // false condition
-                            }
-                            Operation::Condition((left, op, right)) => {
-                                if eval_if(*left, op, *right, &variables) {
-                                    found = true;
-                                    for command in commands {
-                                        match command {
-                                            Command::Instantiation(node) => {
-                                                nodes.push(node);
-                                            }
-                                            _ => unimplemented!(),
-                                        }
-                                    }
-                                } else {
-
-                                }
-                            }
-                            _ => unimplemented!(),
-                        },
-                        ConditionalBuiltin::ElseB => {
-                            for command in commands {
-                                match command {
-                                    Command::Instantiation(node) => {
-                                        nodes.push(node);
-                                    }
-                                    _ => unimplemented!(),
-                                }
-                            }
-                        }
-                    }
+                let tmp = eval_conditional_block(branches, &variables);
+                for elem in tmp {
+                    nodes.push(elem);
                 }
             }
-            // TODO
             Command::For((times, commands)) => {
-                let c = eval_for(times, commands, &variables);
-                for elem in c {
+                let tmp = eval_for(times, commands, &variables);
+                for elem in tmp {
                     nodes.push(elem);
                 }
             }
@@ -381,10 +407,11 @@ fn main() {
     dbg!(rest);
     dbg!(nodes);
 }
-// it parse
-// nested if // IF FOR // FOR IF // nested for //
+
+// it parse for if //
+// it parse nested if //
 // but not evaluating
-// Vec<Command>
 
 // BUGS TO SOLVE
 // true || false are parsed as variables so the command **true: 71.7** will be parsed
+// it is not possible to declare variables inside nested for or nested if
