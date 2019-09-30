@@ -505,7 +505,8 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             Command::Instantiation(nd) => match nd {
                 Node::Circle(v) => {}
                 Node::Square(w) => {
-                    draw.quad().x_y(100.0, 100.0).w_h(100.0, 100.0);
+                    // Operation ???????????????????????????????????????????
+                    //draw.quad().x_y(x, y).w_h(100.0, 100.0);
                     //.color(color.0, color.1, color.2);
                 }
             },
@@ -519,29 +520,6 @@ fn view(app: &App, model: &Model, frame: &Frame) {
 
     // Draw the state of the `Ui` to the frame.
     model.ui.draw_to_frame(app, &frame).unwrap();
-
-    // fn d_s(
-    //     c: &Draw, s: &str, x: f32, y: f32,
-    //     v: f32,
-    //     vw: f32,
-    //     rgb: (f32, f32, f32),
-    // ) -> {
-    //     match shape {
-    //         "box" => {
-    //             c.quad()
-    //                 .x_y(x, y)
-    //                 .w_h(val1, val2)
-    //                 .color(rgb(color.0, color.1, color.2));
-    //         }
-    //         "circle" => {
-    //             c.ellipse()
-    //                 .x_y(x, y)
-    //                 .w_h(val1, val2)
-    //                 .color(rgb(color.0, color.1, color.2));
-    //         }
-    //         _ => (),
-    //     }
-    // }
 }
 
 fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
@@ -553,16 +531,28 @@ fn window_event(_app: &App, model: &mut Model, event: WindowEvent) {
                 if let Ok((remaining, ast)) = parser::parser(&model.text_edit) {
                     println!("{:#?}", parser::parser(&model.text_edit));
                     if remaining == "" {
+                        let mut variables: HashMap<String, f32> = HashMap::new();
+                        let mut nodes: Vec<Node> = vec![];
                         let mut semantic_analysis = true;
                         for x in ast.to_owned() {
                             match x {
-                                Command::Instantiation(nd) => {
-                                    model.instructions.push(Command::Instantiation(nd))
+                                Command::Declaration(declaration) => {
+                                    let (name, value) = declare_variable(declaration, &variables);
+                                    variables.insert(name, value);
                                 }
-                                Command::Declaration(nd) => {
-                                    model.instructions.push(Command::Declaration(nd))
+                                Command::Instantiation(node) => nodes.push(node),
+                                Command::ConditionalBlock(branches) => {
+                                    let tmp = eval_conditional_block(branches, &variables);
+                                    for elem in tmp {
+                                        nodes.push(elem);
+                                    }
                                 }
-                                _ => unimplemented!(),
+                                Command::For((times, commands)) => {
+                                    let tmp = eval_for(times, commands, &variables);
+                                    for elem in tmp {
+                                        nodes.push(elem);
+                                    }
+                                }
                             }
                         }
                         // updating AST only if parser success and there isn't nothing left to parse
