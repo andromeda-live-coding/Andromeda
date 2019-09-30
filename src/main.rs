@@ -378,7 +378,8 @@ fn declare_variable(
 }
 
 fn main() {
-    let content = "for 2 { if 1 > 1 square 2\n  end if }";
+    let content =
+        "for 2 { if 5 > 0 for 2 { if 2 > 1 if 3>2 square 2\n end if  end if } end if    }";
     let (rest, ast) = parser(content).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
