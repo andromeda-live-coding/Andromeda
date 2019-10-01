@@ -284,7 +284,8 @@ fn eval_conditional_block(
                                         nodes.push(elem);
                                     }
                                 }
-                                _ => unimplemented!(),
+                                Command::ResetMove => nodes.push(Command::ResetMove),
+                                Command::Move((x, y)) => nodes.push(Command::Move((x, y))),
                             }
                         }
                     } else {
@@ -343,7 +344,7 @@ fn eval_conditional_block(
 fn eval_for(times: i32, commands: Vec<Command>, variables: &HashMap<String, f32>) -> Vec<Command> {
     let mut v: HashMap<String, f32> = HashMap::new();
     let mut c: Vec<Command> = Vec::new();
-    for x in 0..times {
+    for _ in 0..times {
         for l in commands.clone() {
             match l {
                 Command::Instantiation(nd) => {
@@ -365,6 +366,7 @@ fn eval_for(times: i32, commands: Vec<Command>, variables: &HashMap<String, f32>
                         c.push(elem);
                     }
                 }
+                Command::ResetMove => c.push(Command::ResetMove),
                 Command::Move((x, y)) => c.push(Command::Move((x, y))),
                 _ => unimplemented!(),
             }
@@ -390,8 +392,7 @@ fn declare_variable(
 //
 
 fn main() {
-    let content = "for 2 **(** for 2 **(** move 30, 30 square  **)** **)**
- ";
+    let content = "for 2 times:\nif 2>=2\nsquare 10\nend if\nend_for";
     let (rest, ast) = parser(content).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
@@ -571,13 +572,231 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             Command::ConditionalBlock(branches) => {
                 let tmp = eval_conditional_block(branches, &variables);
                 for elem in tmp {
-                    //nodes.push(elem);
+                    match elem {
+                        Command::Instantiation(node) => match node {
+                            Node::Circle(v) => match v {
+                                Operation::Calculation((l, op, r)) => {
+                                    let a = eval(*l, op, *r, &variables);
+                                    draw.ellipse()
+                                        .x_y(position.0, position.1)
+                                        .w_h(a, a)
+                                        .color(color);
+                                }
+                                Operation::Identity(f) => match f {
+                                    Factor::Number(val) => {
+                                        draw.ellipse()
+                                            .x_y(position.0, position.1)
+                                            .w_h(val, val)
+                                            .color(color);
+                                    }
+                                    Factor::Variable(var_name) => {
+                                        draw.ellipse()
+                                            .x_y(position.0, position.1)
+                                            .w_h(
+                                                get_value(
+                                                    Factor::Variable(var_name.to_string()),
+                                                    &variables,
+                                                ),
+                                                get_value(
+                                                    Factor::Variable(var_name.to_string()),
+                                                    &variables,
+                                                ),
+                                            )
+                                            .color(color);
+                                    }
+                                    Factor::Boolean(_) => unimplemented!(),
+                                },
+                                _ => unimplemented!(),
+                            },
+                            Node::Square((width, height)) => {
+                                let width = match width {
+                                    Operation::Calculation((l, op, right)) => {
+                                        eval(*l, op, *right, &variables)
+                                    }
+                                    Operation::Identity(l) => match l {
+                                        Factor::Number(value) => value,
+                                        Factor::Variable(var) => {
+                                            get_value(Factor::Variable(var), &variables)
+                                        }
+                                        _ => unimplemented!(),
+                                    },
+                                    _ => unimplemented!(),
+                                };
+
+                                let height = match height {
+                                    Operation::Calculation((l, op, right)) => {
+                                        eval(*l, op, *right, &variables)
+                                    }
+                                    Operation::Identity(l) => match l {
+                                        Factor::Number(value) => value,
+                                        Factor::Variable(var) => {
+                                            get_value(Factor::Variable(var), &variables)
+                                        }
+                                        _ => unimplemented!(),
+                                    },
+                                    _ => unimplemented!(),
+                                };
+
+                                draw.quad()
+                                    .x_y(position.0, position.1)
+                                    .w_h(width, height)
+                                    .color(color);
+                            }
+                        },
+                        Command::Move((x, y)) => {
+                            position.0 += match x {
+                                Operation::Calculation((l, op, right)) => {
+                                    eval(*l, op, *right, &variables)
+                                }
+                                Operation::Identity(l) => match l {
+                                    Factor::Number(value) => value,
+                                    Factor::Variable(var) => {
+                                        get_value(Factor::Variable(var), &variables)
+                                    }
+                                    _ => unimplemented!(),
+                                },
+                                _ => unimplemented!(),
+                            };
+                            position.1 += match y {
+                                Operation::Calculation((l, op, right)) => {
+                                    eval(*l, op, *right, &variables)
+                                }
+                                Operation::Identity(l) => match l {
+                                    Factor::Number(value) => value,
+                                    Factor::Variable(var) => {
+                                        get_value(Factor::Variable(var), &variables)
+                                    }
+                                    _ => unimplemented!(),
+                                },
+                                _ => unimplemented!(),
+                            };
+                        }
+                        Command::ResetMove => {
+                            position.0 = 0.0;
+                            position.1 = 0.0;
+                        }
+                        _ => unimplemented!(),
+                    }
                 }
             }
             Command::For((times, commands)) => {
                 let tmp = eval_for(times, commands, &variables);
                 for elem in tmp {
                     match elem {
+                        Command::ConditionalBlock(branches) => {
+                            let tmp2 = eval_conditional_block(branches, &variables);
+                            for elem2 in tmp2 {
+                                match elem2 {
+                                    Command::Instantiation(node) => match node {
+                                        Node::Circle(v) => match v {
+                                            Operation::Calculation((l, op, r)) => {
+                                                let a = eval(*l, op, *r, &variables);
+                                                draw.ellipse()
+                                                    .x_y(position.0, position.1)
+                                                    .w_h(a, a)
+                                                    .color(color);
+                                            }
+                                            Operation::Identity(f) => match f {
+                                                Factor::Number(val) => {
+                                                    draw.ellipse()
+                                                        .x_y(position.0, position.1)
+                                                        .w_h(val, val)
+                                                        .color(color);
+                                                }
+                                                Factor::Variable(var_name) => {
+                                                    draw.ellipse()
+                                                        .x_y(position.0, position.1)
+                                                        .w_h(
+                                                            get_value(
+                                                                Factor::Variable(
+                                                                    var_name.to_string(),
+                                                                ),
+                                                                &variables,
+                                                            ),
+                                                            get_value(
+                                                                Factor::Variable(
+                                                                    var_name.to_string(),
+                                                                ),
+                                                                &variables,
+                                                            ),
+                                                        )
+                                                        .color(color);
+                                                }
+                                                Factor::Boolean(_) => unimplemented!(),
+                                            },
+                                            _ => unimplemented!(),
+                                        },
+                                        Node::Square((width, height)) => {
+                                            let width = match width {
+                                                Operation::Calculation((l, op, right)) => {
+                                                    eval(*l, op, *right, &variables)
+                                                }
+                                                Operation::Identity(l) => match l {
+                                                    Factor::Number(value) => value,
+                                                    Factor::Variable(var) => {
+                                                        get_value(Factor::Variable(var), &variables)
+                                                    }
+                                                    _ => unimplemented!(),
+                                                },
+                                                _ => unimplemented!(),
+                                            };
+
+                                            let height = match height {
+                                                Operation::Calculation((l, op, right)) => {
+                                                    eval(*l, op, *right, &variables)
+                                                }
+                                                Operation::Identity(l) => match l {
+                                                    Factor::Number(value) => value,
+                                                    Factor::Variable(var) => {
+                                                        get_value(Factor::Variable(var), &variables)
+                                                    }
+                                                    _ => unimplemented!(),
+                                                },
+                                                _ => unimplemented!(),
+                                            };
+
+                                            draw.quad()
+                                                .x_y(position.0, position.1)
+                                                .w_h(width, height)
+                                                .color(color);
+                                        }
+                                    },
+                                    Command::Move((x, y)) => {
+                                        position.0 += match x {
+                                            Operation::Calculation((l, op, right)) => {
+                                                eval(*l, op, *right, &variables)
+                                            }
+                                            Operation::Identity(l) => match l {
+                                                Factor::Number(value) => value,
+                                                Factor::Variable(var) => {
+                                                    get_value(Factor::Variable(var), &variables)
+                                                }
+                                                _ => unimplemented!(),
+                                            },
+                                            _ => unimplemented!(),
+                                        };
+                                        position.1 += match y {
+                                            Operation::Calculation((l, op, right)) => {
+                                                eval(*l, op, *right, &variables)
+                                            }
+                                            Operation::Identity(l) => match l {
+                                                Factor::Number(value) => value,
+                                                Factor::Variable(var) => {
+                                                    get_value(Factor::Variable(var), &variables)
+                                                }
+                                                _ => unimplemented!(),
+                                            },
+                                            _ => unimplemented!(),
+                                        };
+                                    }
+                                    Command::ResetMove => {
+                                        position.0 = 0.0;
+                                        position.1 = 0.0;
+                                    }
+                                    _ => unimplemented!(),
+                                }
+                            }
+                        }
                         Command::Instantiation(node) => match node {
                             Node::Circle(v) => match v {
                                 Operation::Calculation((l, op, r)) => {

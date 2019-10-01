@@ -209,17 +209,9 @@ pub fn command_if(input: &str) -> IResult<&str, Command, Error<&str>> {
         tuple((
             tag("if"),
             boolean_expr,
-            many0(alt((command_for, command_if, draw_shape, assignment))),
-            many0(tuple((
-                tag("else if"),
-                boolean_expr,
-                many0(alt((command_for, command_if, draw_shape, assignment))),
-            ))),
-            opt(tuple((
-                tag("else"),
-                multispace0,
-                many0(alt((command_for, command_if, draw_shape, assignment))),
-            ))),
+            parser,
+            many0(tuple((tag("else if"), boolean_expr, parser))),
+            opt(tuple((tag("else"), multispace0, parser))),
             tag("end if"),
             multispace0,
         )),
@@ -612,6 +604,7 @@ mod tests {
     fn if_command() {
         let content = "if x = 1 and (y >= x or x > 3) circle \n end if";
         let (rest, ast) = command_if(content).unwrap();
+        assert_eq!(rest, "");
         assert_eq!(
             ast,
             Command::ConditionalBlock(vec![(
