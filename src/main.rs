@@ -236,8 +236,8 @@ fn eval_boolean_expr(
 fn eval_conditional_block(
     branches: Vec<(ConditionalBuiltin, Operation, Vec<Command>)>,
     variables: &HashMap<String, f32>,
-) -> Vec<Node> {
-    let mut nodes: Vec<Node> = Vec::new();
+) -> Vec<Command> {
+    let mut nodes: Vec<Command> = Vec::new();
     let mut found = false;
 
     for (branch, pred, commands) in branches {
@@ -252,7 +252,7 @@ fn eval_conditional_block(
                     for command in commands {
                         match command {
                             Command::Instantiation(node) => {
-                                nodes.push(node);
+                                nodes.push(Command::Instantiation(node));
                             }
                             _ => unimplemented!(),
                         }
@@ -268,7 +268,7 @@ fn eval_conditional_block(
                             match command {
                                 Command::Declaration(_) => unimplemented!(),
                                 Command::Instantiation(node) => {
-                                    nodes.push(node);
+                                    nodes.push(Command::Instantiation(node));
                                 }
                                 // if if
                                 Command::ConditionalBlock(branches2) => {
@@ -300,7 +300,7 @@ fn eval_conditional_block(
                     for command in commands {
                         match command {
                             Command::Instantiation(node) => {
-                                nodes.push(node);
+                                nodes.push(Command::Instantiation(node));
                             }
                             _ => unimplemented!(),
                         }
@@ -315,7 +315,7 @@ fn eval_conditional_block(
                         for command in commands {
                             match command {
                                 Command::Instantiation(node) => {
-                                    nodes.push(node);
+                                    nodes.push(Command::Instantiation(node));
                                 }
                                 _ => unimplemented!(),
                             }
@@ -329,7 +329,7 @@ fn eval_conditional_block(
                 for command in commands {
                     match command {
                         Command::Instantiation(node) => {
-                            nodes.push(node);
+                            nodes.push(Command::Instantiation(node));
                         }
                         _ => unimplemented!(),
                     }
@@ -340,14 +340,14 @@ fn eval_conditional_block(
     nodes
 }
 
-fn eval_for(times: i32, commands: Vec<Command>, variables: &HashMap<String, f32>) -> Vec<Node> {
+fn eval_for(times: i32, commands: Vec<Command>, variables: &HashMap<String, f32>) -> Vec<Command> {
     let mut v: HashMap<String, f32> = HashMap::new();
-    let mut c: Vec<Node> = Vec::new();
+    let mut c: Vec<Command> = Vec::new();
     for x in 0..times {
         for l in commands.clone() {
             match l {
                 Command::Instantiation(nd) => {
-                    c.push(nd);
+                    c.push(Command::Instantiation(nd));
                 }
                 Command::Declaration((name, value)) => {
                     let (name, value) = declare_variable((name, value), &variables);
@@ -365,6 +365,7 @@ fn eval_for(times: i32, commands: Vec<Command>, variables: &HashMap<String, f32>
                         c.push(elem);
                     }
                 }
+                Command::Move((x, y)) => c.push(Command::Move((x, y))),
                 _ => unimplemented!(),
             }
         }
@@ -389,18 +390,19 @@ fn declare_variable(
 //
 
 fn main() {
-    let content = "x: 23\n y: -x";
+    let content = "for 2 **(** for 2 **(** move 30, 30 square  **)** **)**
+ ";
     let (rest, ast) = parser(content).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
-    let mut nodes: Vec<Node> = vec![];
+    let mut nodes: Vec<Command> = vec![];
     for expression in ast {
         match expression {
             Command::Declaration(declaration) => {
                 let (name, value) = declare_variable(declaration, &variables);
                 variables.insert(name, value);
             }
-            Command::Instantiation(node) => nodes.push(node),
+            Command::Instantiation(node) => nodes.push(Command::Instantiation(node)),
             Command::ConditionalBlock(branches) => {
                 let tmp = eval_conditional_block(branches, &variables);
                 for elem in tmp {
@@ -575,7 +577,111 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             Command::For((times, commands)) => {
                 let tmp = eval_for(times, commands, &variables);
                 for elem in tmp {
-                    //nodes.push(elem);
+                    match elem {
+                        Command::Instantiation(node) => match node {
+                            Node::Circle(v) => match v {
+                                Operation::Calculation((l, op, r)) => {
+                                    let a = eval(*l, op, *r, &variables);
+                                    draw.ellipse()
+                                        .x_y(position.0, position.1)
+                                        .w_h(a, a)
+                                        .color(color);
+                                }
+                                Operation::Identity(f) => match f {
+                                    Factor::Number(val) => {
+                                        draw.ellipse()
+                                            .x_y(position.0, position.1)
+                                            .w_h(val, val)
+                                            .color(color);
+                                    }
+                                    Factor::Variable(var_name) => {
+                                        draw.ellipse()
+                                            .x_y(position.0, position.1)
+                                            .w_h(
+                                                get_value(
+                                                    Factor::Variable(var_name.to_string()),
+                                                    &variables,
+                                                ),
+                                                get_value(
+                                                    Factor::Variable(var_name.to_string()),
+                                                    &variables,
+                                                ),
+                                            )
+                                            .color(color);
+                                    }
+                                    Factor::Boolean(_) => unimplemented!(),
+                                },
+                                _ => unimplemented!(),
+                            },
+                            Node::Square((width, height)) => {
+                                let width = match width {
+                                    Operation::Calculation((l, op, right)) => {
+                                        eval(*l, op, *right, &variables)
+                                    }
+                                    Operation::Identity(l) => match l {
+                                        Factor::Number(value) => value,
+                                        Factor::Variable(var) => {
+                                            get_value(Factor::Variable(var), &variables)
+                                        }
+                                        _ => unimplemented!(),
+                                    },
+                                    _ => unimplemented!(),
+                                };
+
+                                let height = match height {
+                                    Operation::Calculation((l, op, right)) => {
+                                        eval(*l, op, *right, &variables)
+                                    }
+                                    Operation::Identity(l) => match l {
+                                        Factor::Number(value) => value,
+                                        Factor::Variable(var) => {
+                                            get_value(Factor::Variable(var), &variables)
+                                        }
+                                        _ => unimplemented!(),
+                                    },
+                                    _ => unimplemented!(),
+                                };
+
+                                draw.quad()
+                                    .x_y(position.0, position.1)
+                                    .w_h(width, height)
+                                    .color(color);
+                            }
+                        },
+                        Command::Move((x, y)) => {
+                            position.0 += match x {
+                                Operation::Calculation((l, op, right)) => {
+                                    eval(*l, op, *right, &variables)
+                                }
+                                Operation::Identity(l) => match l {
+                                    Factor::Number(value) => value,
+                                    Factor::Variable(var) => {
+                                        get_value(Factor::Variable(var), &variables)
+                                    }
+                                    _ => unimplemented!(),
+                                },
+                                _ => unimplemented!(),
+                            };
+                            position.1 += match y {
+                                Operation::Calculation((l, op, right)) => {
+                                    eval(*l, op, *right, &variables)
+                                }
+                                Operation::Identity(l) => match l {
+                                    Factor::Number(value) => value,
+                                    Factor::Variable(var) => {
+                                        get_value(Factor::Variable(var), &variables)
+                                    }
+                                    _ => unimplemented!(),
+                                },
+                                _ => unimplemented!(),
+                            };
+                        }
+                        Command::ResetMove => {
+                            position.0 = 0.0;
+                            position.1 = 0.0;
+                        }
+                        _ => unimplemented!(),
+                    }
                 }
             }
             Command::Move((x, y)) => {

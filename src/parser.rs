@@ -337,7 +337,7 @@ fn command_for(input: &str) -> IResult<&str, Command, Error<&str>> {
             multispace0,
             digit1,
             multispace0,
-            delimited(tag("{"), parser, tag("}")),
+            delimited(tag("times:"), parser, tag("end_for")),
             multispace0,
         )),
         |(_, _, times, _, v, _): (_, _, &str, _, Vec<Command>, _)| {
