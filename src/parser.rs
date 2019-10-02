@@ -93,6 +93,7 @@ pub enum Command {
     For((i32, Vec<Command>)),
     Move((Operation, Operation)),
     ResetMove,
+    Color((f32, f32, f32))
 }
 
 pub fn number(input: &str) -> IResult<&str, Factor, Error<&str>> {
@@ -351,11 +352,18 @@ fn command_reset_move(input: &str) -> IResult<&str, Command, Error<&str>> {
     })(input)
 }
 
+fn command_color(input: &str) -> IResult<&str, Command, Error<&str>> {
+    map(tuple((tag("color"), multispace0, float, multispace0, float, multispace0, float, multispace0)),
+        |(_, _, r, _, g, _, b, _)| Command::Color((r, g, b)),
+    )(input)
+}
+
 pub fn parser(input: &str) -> IResult<&str, Vec<Command>, Error<&str>> {
     many0(terminated(
         preceded(
             multispace0,
             alt((
+                command_color,
                 command_reset_move,
                 command_move,
                 command_for,

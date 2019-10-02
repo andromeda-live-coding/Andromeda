@@ -286,6 +286,7 @@ fn eval_conditional_block(
                                 }
                                 Command::ResetMove => nodes.push(Command::ResetMove),
                                 Command::Move((x, y)) => nodes.push(Command::Move((x, y))),
+                                Command::Color((r, g, b)) => unimplemented!(),
                             }
                         }
                     } else {
@@ -368,7 +369,7 @@ fn eval_for(times: i32, commands: Vec<Command>, variables: &HashMap<String, f32>
                 }
                 Command::ResetMove => c.push(Command::ResetMove),
                 Command::Move((x, y)) => c.push(Command::Move((x, y))),
-                _ => unimplemented!(),
+                Command::Color((r, g, b)) => c.push(Command::Color((r, g, b))),
             }
         }
     }
@@ -506,7 +507,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     let mut position: (f32, f32) = (0.0, 0.0);
     let _std_value = 10.0;
     draw.background().rgb(0.39, 0.39, 0.39);
-    let color = rgb(1.0, 1.0, 1.0);
+    let mut color = rgb(1.0, 1.0, 1.0);
     for x in model.instructions.clone() {
         match x {
             Command::Declaration((name, value)) => {
@@ -904,7 +905,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                 }
             }
             Command::Move((x, y)) => {
-                position.0 = match x {
+                position.0 += match x {
                     Operation::Calculation((l, op, right)) => eval(*l, op, *right, &variables),
                     Operation::Identity(l) => match l {
                         Factor::Number(value) => value,
@@ -913,7 +914,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                     },
                     _ => unimplemented!(),
                 };
-                position.1 = match y {
+                position.1 += match y {
                     Operation::Calculation((l, op, right)) => eval(*l, op, *right, &variables),
                     Operation::Identity(l) => match l {
                         Factor::Number(value) => value,
@@ -926,6 +927,9 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             Command::ResetMove => {
                 position.0 = 0.0;
                 position.1 = 0.0;
+            }
+            Command::Color((r, g, b)) => {
+                color = rgb(r, g, b);
             }
         }
     }
