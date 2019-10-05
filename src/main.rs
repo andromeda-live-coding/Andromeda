@@ -444,7 +444,7 @@ struct Ids {
 fn model(app: &App) -> Model {
     app.set_loop_mode(LoopMode::wait(3));
     app.new_window()
-        .with_dimensions(1280, 1024)
+        .with_dimensions(720, 500)
         .event(window_event)
         .raw_event(raw_window_event)
         .key_pressed(key_pressed)
@@ -506,7 +506,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     let draw = app.draw();
     let mut position: (f32, f32) = (0.0, 0.0);
     let _std_value = 10.0;
-    draw.background().rgb(0.39, 0.39, 0.39);
+    draw.background().rgb(0.83, 0.83, 0.83);
     let mut color = rgb(1.0, 1.0, 1.0);
     for x in model.instructions.clone() {
         match x {
