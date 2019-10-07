@@ -30,6 +30,8 @@ pub enum Factor {
     Variable(String),
     Number(f32),
     Boolean(bool),
+    Sin(f32),
+    Cos(f32),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -93,7 +95,7 @@ pub enum Command {
     For((i32, Vec<Command>)),
     Move((Operation, Operation)),
     ResetMove,
-    Color((f32, f32, f32))
+    Color((f32, f32, f32)),
 }
 
 pub fn number(input: &str) -> IResult<&str, Factor, Error<&str>> {
@@ -102,6 +104,17 @@ pub fn number(input: &str) -> IResult<&str, Factor, Error<&str>> {
 
 pub fn variable(input: &str) -> IResult<&str, Factor, Error<&str>> {
     map(alpha1, |v: &str| Factor::Variable(v.to_string()))(input)
+}
+
+pub fn sin(input: &str) -> IResult<&str, Factor, Error<&str>> {
+    map(
+        tuple((
+            tag("sin"),
+            multispace0,
+            delimited(tag("("), float, tag(")")),
+        )),
+        |(_, _, val)| Factor::Sin(val),
+    )(input)
 }
 
 pub fn mult(input: &str) -> IResult<&str, Builtin, Error<&str>> {
@@ -126,6 +139,7 @@ pub fn factor(input: &str) -> IResult<&str, Operation, Error<&str>> {
             space0,
             alt((
                 delimited(tag("("), expr, tag(")")),
+                map(sin, Operation::Identity),
                 map(variable, Operation::Identity),
                 map(number, Operation::Identity),
             )),
@@ -353,7 +367,17 @@ fn command_reset_move(input: &str) -> IResult<&str, Command, Error<&str>> {
 }
 
 fn command_color(input: &str) -> IResult<&str, Command, Error<&str>> {
-    map(tuple((tag("color"), multispace0, float, multispace0, float, multispace0, float, multispace0)),
+    map(
+        tuple((
+            tag("color"),
+            multispace0,
+            float,
+            multispace0,
+            float,
+            multispace0,
+            float,
+            multispace0,
+        )),
         |(_, _, r, _, g, _, b, _)| Command::Color((r, g, b)),
     )(input)
 }

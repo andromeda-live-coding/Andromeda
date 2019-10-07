@@ -9,6 +9,8 @@ fn get_value(factor: Factor, variables: &HashMap<String, f32>) -> f32 {
     match factor {
         Factor::Number(number) => number,
         Factor::Variable(variable_name) => *variables.get(&variable_name).unwrap(),
+        Factor::Sin(val) => val.sin(),
+        Factor::Cos(val) => val.cos(),
         _ => unimplemented!(),
     }
 }
@@ -540,6 +542,18 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                 .color(color);
                         }
                         Factor::Boolean(_) => unimplemented!(),
+                        Factor::Sin(val) => {
+                            draw.ellipse()
+                                .x_y(position.0, position.1)
+                                .w_h(val.sin(), val.sin())
+                                .color(color);
+                        }
+                        Factor::Cos(val) => {
+                            draw.ellipse()
+                                .x_y(position.0, position.1)
+                                .w_h(val.cos(), val.cos())
+                                .color(color);
+                        }
                     },
                     _ => unimplemented!(),
                 },
@@ -606,6 +620,18 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                             .color(color);
                                     }
                                     Factor::Boolean(_) => unimplemented!(),
+                                    Factor::Sin(val) => {
+                                        draw.ellipse()
+                                            .x_y(position.0, position.1)
+                                            .w_h(val.sin(), val.sin())
+                                            .color(color);
+                                    }
+                                    Factor::Cos(val) => {
+                                        draw.ellipse()
+                                            .x_y(position.0, position.1)
+                                            .w_h(val.cos(), val.cos())
+                                            .color(color);
+                                    }
                                 },
                                 _ => unimplemented!(),
                             },
@@ -724,6 +750,18 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                                         .color(color);
                                                 }
                                                 Factor::Boolean(_) => unimplemented!(),
+                                                Factor::Sin(val) => {
+                                                    draw.ellipse()
+                                                        .x_y(position.0, position.1)
+                                                        .w_h(val.sin(), val.sin())
+                                                        .color(color);
+                                                }
+                                                Factor::Cos(val) => {
+                                                    draw.ellipse()
+                                                        .x_y(position.0, position.1)
+                                                        .w_h(val.cos(), val.cos())
+                                                        .color(color);
+                                                }
                                             },
                                             _ => unimplemented!(),
                                         },
@@ -830,6 +868,18 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                             .color(color);
                                     }
                                     Factor::Boolean(_) => unimplemented!(),
+                                    Factor::Sin(val) => {
+                                        draw.ellipse()
+                                            .x_y(position.0, position.1)
+                                            .w_h(val.sin(), val.sin())
+                                            .color(color);
+                                    }
+                                    Factor::Cos(val) => {
+                                        draw.ellipse()
+                                            .x_y(position.0, position.1)
+                                            .w_h(val.cos(), val.cos())
+                                            .color(color);
+                                    }
                                 },
                                 _ => unimplemented!(),
                             },
