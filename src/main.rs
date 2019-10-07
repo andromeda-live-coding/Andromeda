@@ -5,25 +5,40 @@ use nannou::prelude::*;
 use nannou::ui::prelude::*;
 use parser::*;
 use std::collections::HashMap;
-fn get_value(factor: Factor, variables: &HashMap<String, f32>) -> f32 {
+fn get_value(factor: Factor, variables: &HashMap<String, f32>, time: f32) -> f32 {
     match factor {
         Factor::Number(number) => number,
         Factor::Variable(variable_name) => *variables.get(&variable_name).unwrap(),
-        Factor::Sin(val) => val.sin(),
-        Factor::Cos(val) => val.cos(),
+        Factor::Sin(v) => match *v {
+            Operation::Calculation((l, op, right)) => eval(*l, op, *right, &variables, time).sin(),
+            Operation::Identity(val) => get_value(val, variables, time).sin(),
+            _ => unimplemented!(),
+        },
+        Factor::Cos(val) => 0.0,
+        Factor::Time => time,
         _ => unimplemented!(),
     }
 }
 
-fn eval(first: Operation, op: Builtin, second: Operation, variables: &HashMap<String, f32>) -> f32 {
+fn eval(
+    first: Operation,
+    op: Builtin,
+    second: Operation,
+    variables: &HashMap<String, f32>,
+    life_time: f32,
+) -> f32 {
     let first = match first {
-        Operation::Identity(first) => get_value(first, variables),
-        Operation::Calculation((first, op, second)) => eval(*first, op, *second, variables),
+        Operation::Identity(first) => get_value(first, variables, life_time),
+        Operation::Calculation((first, op, second)) => {
+            eval(*first, op, *second, variables, life_time)
+        }
         _ => unimplemented!(),
     };
     let second = match second {
-        Operation::Identity(second) => get_value(second, variables),
-        Operation::Calculation((first, op, second)) => eval(*first, op, *second, variables),
+        Operation::Identity(second) => get_value(second, variables, life_time),
+        Operation::Calculation((first, op, second)) => {
+            eval(*first, op, *second, variables, life_time)
+        }
         _ => unimplemented!(),
     };
     match op {
@@ -40,6 +55,7 @@ fn eval_boolean_expr(
     op: Builtin,
     second: Operation,
     variables: &HashMap<String, f32>,
+    life_time: f32,
 ) -> bool {
     match (first, second) {
         (
@@ -47,7 +63,9 @@ fn eval_boolean_expr(
             Operation::Calculation((left3, op3, right3)),
         ) => match op {
             Builtin::Greater => {
-                if eval(*left2, op2, *right2, variables) > eval(*left3, op3, *right3, variables) {
+                if eval(*left2, op2, *right2, variables, life_time)
+                    > eval(*left3, op3, *right3, variables, life_time)
+                {
                     true
                 } else {
                     false
@@ -60,8 +78,8 @@ fn eval_boolean_expr(
             Operation::Condition((left3, op3, right3)),
         ) => match op {
             Builtin::And => {
-                if eval_boolean_expr(*left2, op2, *right2, variables)
-                    && eval_boolean_expr(*left3, op3, *right3, variables)
+                if eval_boolean_expr(*left2, op2, *right2, variables, life_time)
+                    && eval_boolean_expr(*left3, op3, *right3, variables, life_time)
                 {
                     true
                 } else {
@@ -69,8 +87,8 @@ fn eval_boolean_expr(
                 }
             }
             Builtin::Or => {
-                if eval_boolean_expr(*left2, op2, *right2, variables)
-                    || eval_boolean_expr(*left3, op3, *right3, variables)
+                if eval_boolean_expr(*left2, op2, *right2, variables, life_time)
+                    || eval_boolean_expr(*left3, op3, *right3, variables, life_time)
                 {
                     true
                 } else {
@@ -81,35 +99,35 @@ fn eval_boolean_expr(
         },
         (Operation::Identity(val1), Operation::Identity(val2)) => match op {
             Builtin::Greater => {
-                if get_value(val1, variables) > get_value(val2, &variables) {
+                if get_value(val1, variables, life_time) > get_value(val2, &variables, life_time) {
                     true
                 } else {
                     false
                 }
             }
             Builtin::GreaterOrEqual => {
-                if get_value(val1, variables) >= get_value(val2, &variables) {
+                if get_value(val1, variables, life_time) >= get_value(val2, &variables, life_time) {
                     true
                 } else {
                     false
                 }
             }
             Builtin::Equal => {
-                if get_value(val1, variables) == get_value(val2, &variables) {
+                if get_value(val1, variables, life_time) == get_value(val2, &variables, life_time) {
                     true
                 } else {
                     false
                 }
             }
             Builtin::LesserOrEqual => {
-                if get_value(val1, variables) <= get_value(val2, &variables) {
+                if get_value(val1, variables, life_time) <= get_value(val2, &variables, life_time) {
                     true
                 } else {
                     false
                 }
             }
             Builtin::Lesser => {
-                if get_value(val1, variables) < get_value(val2, &variables) {
+                if get_value(val1, variables, life_time) < get_value(val2, &variables, life_time) {
                     true
                 } else {
                     false
@@ -119,35 +137,45 @@ fn eval_boolean_expr(
         },
         (Operation::Calculation((left2, op2, right2)), Operation::Identity(val)) => match op {
             Builtin::Greater => {
-                if eval(*left2, op2, *right2, &variables) > get_value(val, &variables) {
+                if eval(*left2, op2, *right2, &variables, life_time)
+                    > get_value(val, &variables, life_time)
+                {
                     true
                 } else {
                     false
                 }
             }
             Builtin::GreaterOrEqual => {
-                if eval(*left2, op2, *right2, &variables) >= get_value(val, &variables) {
+                if eval(*left2, op2, *right2, &variables, life_time)
+                    >= get_value(val, &variables, life_time)
+                {
                     true
                 } else {
                     false
                 }
             }
             Builtin::Equal => {
-                if eval(*left2, op2, *right2, &variables) == get_value(val, &variables) {
+                if eval(*left2, op2, *right2, &variables, life_time)
+                    == get_value(val, &variables, life_time)
+                {
                     true
                 } else {
                     false
                 }
             }
             Builtin::LesserOrEqual => {
-                if eval(*left2, op2, *right2, &variables) <= get_value(val, &variables) {
+                if eval(*left2, op2, *right2, &variables, life_time)
+                    <= get_value(val, &variables, life_time)
+                {
                     true
                 } else {
                     false
                 }
             }
             Builtin::Lesser => {
-                if eval(*left2, op2, *right2, &variables) < get_value(val, &variables) {
+                if eval(*left2, op2, *right2, &variables, life_time)
+                    < get_value(val, &variables, life_time)
+                {
                     true
                 } else {
                     false
@@ -157,35 +185,45 @@ fn eval_boolean_expr(
         },
         (Operation::Identity(val), Operation::Calculation((left2, op2, right2))) => match op {
             Builtin::Greater => {
-                if get_value(val, &variables) > eval(*left2, op2, *right2, &variables) {
+                if get_value(val, &variables, life_time)
+                    > eval(*left2, op2, *right2, &variables, life_time)
+                {
                     true
                 } else {
                     false
                 }
             }
             Builtin::GreaterOrEqual => {
-                if get_value(val, &variables) >= eval(*left2, op2, *right2, &variables) {
+                if get_value(val, &variables, life_time)
+                    >= eval(*left2, op2, *right2, &variables, life_time)
+                {
                     true
                 } else {
                     false
                 }
             }
             Builtin::Equal => {
-                if get_value(val, &variables) == eval(*left2, op2, *right2, &variables) {
+                if get_value(val, &variables, life_time)
+                    == eval(*left2, op2, *right2, &variables, life_time)
+                {
                     true
                 } else {
                     false
                 }
             }
             Builtin::Lesser => {
-                if get_value(val, &variables) < eval(*left2, op2, *right2, &variables) {
+                if get_value(val, &variables, life_time)
+                    < eval(*left2, op2, *right2, &variables, life_time)
+                {
                     true
                 } else {
                     false
                 }
             }
             Builtin::LesserOrEqual => {
-                if get_value(val, &variables) <= eval(*left2, op2, *right2, &variables) {
+                if get_value(val, &variables, life_time)
+                    <= eval(*left2, op2, *right2, &variables, life_time)
+                {
                     true
                 } else {
                     false
@@ -196,14 +234,14 @@ fn eval_boolean_expr(
         (Operation::Condition((left2, op2, right2)), Operation::Identity(Factor::Boolean(val))) => {
             match op {
                 Builtin::And => {
-                    if eval_boolean_expr(*left2, op2, *right2, &variables) && val {
+                    if eval_boolean_expr(*left2, op2, *right2, &variables, life_time) && val {
                         true
                     } else {
                         false
                     }
                 }
                 Builtin::Or => {
-                    if eval_boolean_expr(*left2, op2, *right2, &variables) || val {
+                    if eval_boolean_expr(*left2, op2, *right2, &variables, life_time) || val {
                         true
                     } else {
                         false
@@ -215,14 +253,14 @@ fn eval_boolean_expr(
         (Operation::Identity(Factor::Boolean(val)), Operation::Condition((left2, op2, right2))) => {
             match op {
                 Builtin::And => {
-                    if val && eval_boolean_expr(*left2, op2, *right2, &variables) {
+                    if val && eval_boolean_expr(*left2, op2, *right2, &variables, life_time) {
                         true
                     } else {
                         false
                     }
                 }
                 Builtin::Or => {
-                    if val || eval_boolean_expr(*left2, op2, *right2, &variables) {
+                    if val || eval_boolean_expr(*left2, op2, *right2, &variables, life_time) {
                         true
                     } else {
                         false
@@ -238,6 +276,7 @@ fn eval_boolean_expr(
 fn eval_conditional_block(
     branches: Vec<(ConditionalBuiltin, Operation, Vec<Command>)>,
     variables: &HashMap<String, f32>,
+    life_time: f32,
 ) -> Vec<Command> {
     let mut nodes: Vec<Command> = Vec::new();
     let mut found = false;
@@ -264,7 +303,7 @@ fn eval_conditional_block(
                     // false condition
                 }
                 Operation::Condition((left, op, right)) => {
-                    if eval_boolean_expr(*left, op, *right, &variables) {
+                    if eval_boolean_expr(*left, op, *right, &variables, life_time) {
                         found = true;
                         for command in commands {
                             match command {
@@ -275,13 +314,14 @@ fn eval_conditional_block(
                                 // if if
                                 Command::ConditionalBlock(branches2) => {
                                     // eval_conditional_block
-                                    let c = eval_conditional_block(branches2, &variables);
+                                    let c =
+                                        eval_conditional_block(branches2, &variables, life_time);
                                     for elem in c {
                                         nodes.push(elem);
                                     }
                                 }
                                 Command::For((n, cmds)) => {
-                                    let c = eval_for(n, cmds, &variables);
+                                    let c = eval_for(n, cmds, &variables, life_time);
                                     for elem in c {
                                         nodes.push(elem);
                                     }
@@ -314,7 +354,7 @@ fn eval_conditional_block(
                     // false condition
                 }
                 Operation::Condition((left, op, right)) => {
-                    if eval_boolean_expr(*left, op, *right, &variables) {
+                    if eval_boolean_expr(*left, op, *right, &variables, life_time) {
                         found = true;
                         for command in commands {
                             match command {
@@ -344,7 +384,12 @@ fn eval_conditional_block(
     nodes
 }
 
-fn eval_for(times: i32, commands: Vec<Command>, variables: &HashMap<String, f32>) -> Vec<Command> {
+fn eval_for(
+    times: i32,
+    commands: Vec<Command>,
+    variables: &HashMap<String, f32>,
+    life_time: f32,
+) -> Vec<Command> {
     let mut v: HashMap<String, f32> = HashMap::new();
     let mut c: Vec<Command> = Vec::new();
     for _ in 0..times {
@@ -354,17 +399,17 @@ fn eval_for(times: i32, commands: Vec<Command>, variables: &HashMap<String, f32>
                     c.push(Command::Instantiation(nd));
                 }
                 Command::Declaration((name, value)) => {
-                    let (name, value) = declare_variable((name, value), &variables);
+                    let (name, value) = declare_variable((name, value), &variables, life_time);
                     v.insert(name, value);
                 }
                 Command::ConditionalBlock(cb) => {
-                    let nodes = eval_conditional_block(cb, &variables);
+                    let nodes = eval_conditional_block(cb, &variables, life_time);
                     for elem in nodes {
                         c.push(elem);
                     }
                 }
                 Command::For((times, commands)) => {
-                    let nodes = eval_for(times, commands, variables);
+                    let nodes = eval_for(times, commands, variables, life_time);
                     for elem in nodes {
                         c.push(elem);
                     }
@@ -381,10 +426,13 @@ fn eval_for(times: i32, commands: Vec<Command>, variables: &HashMap<String, f32>
 fn declare_variable(
     (name, value): (String, Operation),
     variables: &HashMap<String, f32>,
+    life_time: f32,
 ) -> (String, f32) {
     match value {
-        Operation::Identity(factor) => (name, get_value(factor, variables)),
-        Operation::Calculation((first, op, second)) => (name, eval(*first, op, *second, variables)),
+        Operation::Identity(factor) => (name, get_value(factor, variables, life_time)),
+        Operation::Calculation((first, op, second)) => {
+            (name, eval(*first, op, *second, variables, life_time))
+        }
         _ => unimplemented!(),
     }
 }
@@ -395,7 +443,7 @@ fn declare_variable(
 //
 
 fn main() {
-    let content = "for 2 times:\nif 2>=2\nsquare 10\nend if\nend_for";
+    let content = "";
     let (rest, ast) = parser(content).unwrap();
     dbg!(ast.clone());
     let mut variables: HashMap<String, f32> = HashMap::new();
@@ -403,18 +451,18 @@ fn main() {
     for expression in ast {
         match expression {
             Command::Declaration(declaration) => {
-                let (name, value) = declare_variable(declaration, &variables);
+                let (name, value) = declare_variable(declaration, &variables, 0.0);
                 variables.insert(name, value);
             }
             Command::Instantiation(node) => nodes.push(Command::Instantiation(node)),
             Command::ConditionalBlock(branches) => {
-                let tmp = eval_conditional_block(branches, &variables);
+                let tmp = eval_conditional_block(branches, &variables, 0.0);
                 for elem in tmp {
                     nodes.push(elem);
                 }
             }
             Command::For((times, commands)) => {
-                let tmp = eval_for(times, commands, &variables);
+                let tmp = eval_for(times, commands, &variables, 0.0);
                 for elem in tmp {
                     nodes.push(elem);
                 }
@@ -437,10 +485,12 @@ struct Model {
     text_edit: String,
     //variables: HashMap<String, f32>,
     instructions: Vec<Command>,
+    life_time: f32,
 }
 
 struct Ids {
     text_edit: widget::Id,
+    life_time: widget::Id,
 }
 
 fn model(app: &App) -> Model {
@@ -472,10 +522,12 @@ fn model(app: &App) -> Model {
     // Generate some ids for our widgets.
     let ids = Ids {
         text_edit: ui.generate_widget_id(),
+        life_time: ui.generate_widget_id(),
     };
 
     // Init our variables
     let text_edit = "".to_string();
+    let life_time = 0.0;
     //let variables = HashMap::new();
     let instructions: Vec<Command> = Vec::new();
 
@@ -485,12 +537,13 @@ fn model(app: &App) -> Model {
         text_edit,
         //variables,
         instructions,
+        life_time,
     }
 }
 
 fn update(_app: &App, model: &mut Model, _update: Update) {
     let ui = &mut model.ui.set_widgets();
-
+    model.life_time = _app.time;
     if let Some(edit) = widget::TextEdit::new(&model.text_edit)
         .color(color::WHITE)
         .font_size(16)
@@ -506,6 +559,7 @@ fn update(_app: &App, model: &mut Model, _update: Update) {
 fn view(app: &App, model: &Model, frame: &Frame) {
     let mut variables: HashMap<String, f32> = HashMap::new();
     let draw = app.draw();
+    let life_time = model.life_time;
     let mut position: (f32, f32) = (0.0, 0.0);
     let _std_value = 10.0;
     draw.background().rgb(0.83, 0.83, 0.83);
@@ -513,16 +567,18 @@ fn view(app: &App, model: &Model, frame: &Frame) {
     for x in model.instructions.clone() {
         match x {
             Command::Declaration((name, value)) => {
-                let (name, value) = declare_variable((name.to_string(), value.clone()), &variables);
+                let (name, value) =
+                    declare_variable((name.to_string(), value.clone()), &variables, life_time);
                 variables.insert(name, value);
             }
             Command::Instantiation(nd) => match nd {
                 Node::Circle(v) => match v {
                     Operation::Calculation((l, op, r)) => {
-                        let a = eval(*l, op, *r, &variables);
+                        let val = eval(*l, op, *r, &variables, life_time);
+                        dbg!(val);
                         draw.ellipse()
                             .x_y(position.0, position.1)
-                            .w_h(a, a)
+                            .w_h(val, val)
                             .color(color);
                     }
                     Operation::Identity(f) => match f {
@@ -536,43 +592,66 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                             draw.ellipse()
                                 .x_y(position.0, position.1)
                                 .w_h(
-                                    get_value(Factor::Variable(var_name.to_string()), &variables),
-                                    get_value(Factor::Variable(var_name.to_string()), &variables),
+                                    get_value(
+                                        Factor::Variable(var_name.to_string()),
+                                        &variables,
+                                        life_time,
+                                    ),
+                                    get_value(
+                                        Factor::Variable(var_name.to_string()),
+                                        &variables,
+                                        life_time,
+                                    ),
                                 )
                                 .color(color);
                         }
                         Factor::Boolean(_) => unimplemented!(),
-                        Factor::Sin(val) => {
-                            draw.ellipse()
-                                .x_y(position.0, position.1)
-                                .w_h(val.sin(), val.sin())
-                                .color(color);
-                        }
+                        Factor::Sin(val) => match *val {
+                            Operation::Calculation((l, op, r)) => {
+                                let val = eval(*l, op, *r, &variables, life_time).sin();
+                                dbg!(val);
+                                draw.ellipse()
+                                    .x_y(position.0, position.1)
+                                    .w_h(val, val)
+                                    .color(color);
+                            }
+                            Operation::Identity(v) => unimplemented!(),
+                            _ => unimplemented!(),
+                        },
                         Factor::Cos(val) => {
                             draw.ellipse()
                                 .x_y(position.0, position.1)
                                 .w_h(val.cos(), val.cos())
                                 .color(color);
                         }
+                        Factor::Time => unimplemented!(),
                     },
                     _ => unimplemented!(),
                 },
                 Node::Square((width, height)) => {
                     let width = match width {
-                        Operation::Calculation((l, op, right)) => eval(*l, op, *right, &variables),
+                        Operation::Calculation((l, op, right)) => {
+                            eval(*l, op, *right, &variables, life_time)
+                        }
                         Operation::Identity(l) => match l {
                             Factor::Number(value) => value,
-                            Factor::Variable(var) => get_value(Factor::Variable(var), &variables),
+                            Factor::Variable(var) => {
+                                get_value(Factor::Variable(var), &variables, life_time)
+                            }
                             _ => unimplemented!(),
                         },
                         _ => unimplemented!(),
                     };
 
                     let height = match height {
-                        Operation::Calculation((l, op, right)) => eval(*l, op, *right, &variables),
+                        Operation::Calculation((l, op, right)) => {
+                            eval(*l, op, *right, &variables, life_time)
+                        }
                         Operation::Identity(l) => match l {
                             Factor::Number(value) => value,
-                            Factor::Variable(var) => get_value(Factor::Variable(var), &variables),
+                            Factor::Variable(var) => {
+                                get_value(Factor::Variable(var), &variables, life_time)
+                            }
                             _ => unimplemented!(),
                         },
                         _ => unimplemented!(),
@@ -585,13 +664,13 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                 }
             },
             Command::ConditionalBlock(branches) => {
-                let tmp = eval_conditional_block(branches, &variables);
+                let tmp = eval_conditional_block(branches, &variables, life_time);
                 for elem in tmp {
                     match elem {
                         Command::Instantiation(node) => match node {
                             Node::Circle(v) => match v {
                                 Operation::Calculation((l, op, r)) => {
-                                    let a = eval(*l, op, *r, &variables);
+                                    let a = eval(*l, op, *r, &variables, life_time);
                                     draw.ellipse()
                                         .x_y(position.0, position.1)
                                         .w_h(a, a)
@@ -611,20 +690,22 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                                 get_value(
                                                     Factor::Variable(var_name.to_string()),
                                                     &variables,
+                                                    life_time,
                                                 ),
                                                 get_value(
                                                     Factor::Variable(var_name.to_string()),
                                                     &variables,
+                                                    life_time,
                                                 ),
                                             )
                                             .color(color);
                                     }
                                     Factor::Boolean(_) => unimplemented!(),
                                     Factor::Sin(val) => {
-                                        draw.ellipse()
-                                            .x_y(position.0, position.1)
-                                            .w_h(val.sin(), val.sin())
-                                            .color(color);
+                                        // draw.ellipse()
+                                        //     .x_y(position.0, position.1)
+                                        //     .w_h(val.sin(), val.sin())
+                                        //     .color(color);
                                     }
                                     Factor::Cos(val) => {
                                         draw.ellipse()
@@ -632,18 +713,19 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                             .w_h(val.cos(), val.cos())
                                             .color(color);
                                     }
+                                    Factor::Time => unimplemented!(),
                                 },
                                 _ => unimplemented!(),
                             },
                             Node::Square((width, height)) => {
                                 let width = match width {
                                     Operation::Calculation((l, op, right)) => {
-                                        eval(*l, op, *right, &variables)
+                                        eval(*l, op, *right, &variables, life_time)
                                     }
                                     Operation::Identity(l) => match l {
                                         Factor::Number(value) => value,
                                         Factor::Variable(var) => {
-                                            get_value(Factor::Variable(var), &variables)
+                                            get_value(Factor::Variable(var), &variables, life_time)
                                         }
                                         _ => unimplemented!(),
                                     },
@@ -652,12 +734,12 @@ fn view(app: &App, model: &Model, frame: &Frame) {
 
                                 let height = match height {
                                     Operation::Calculation((l, op, right)) => {
-                                        eval(*l, op, *right, &variables)
+                                        eval(*l, op, *right, &variables, life_time)
                                     }
                                     Operation::Identity(l) => match l {
                                         Factor::Number(value) => value,
                                         Factor::Variable(var) => {
-                                            get_value(Factor::Variable(var), &variables)
+                                            get_value(Factor::Variable(var), &variables, life_time)
                                         }
                                         _ => unimplemented!(),
                                     },
@@ -673,12 +755,12 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                         Command::Move((x, y)) => {
                             position.0 += match x {
                                 Operation::Calculation((l, op, right)) => {
-                                    eval(*l, op, *right, &variables)
+                                    eval(*l, op, *right, &variables, life_time)
                                 }
                                 Operation::Identity(l) => match l {
                                     Factor::Number(value) => value,
                                     Factor::Variable(var) => {
-                                        get_value(Factor::Variable(var), &variables)
+                                        get_value(Factor::Variable(var), &variables, life_time)
                                     }
                                     _ => unimplemented!(),
                                 },
@@ -686,12 +768,12 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                             };
                             position.1 += match y {
                                 Operation::Calculation((l, op, right)) => {
-                                    eval(*l, op, *right, &variables)
+                                    eval(*l, op, *right, &variables, life_time)
                                 }
                                 Operation::Identity(l) => match l {
                                     Factor::Number(value) => value,
                                     Factor::Variable(var) => {
-                                        get_value(Factor::Variable(var), &variables)
+                                        get_value(Factor::Variable(var), &variables, life_time)
                                     }
                                     _ => unimplemented!(),
                                 },
@@ -707,17 +789,17 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                 }
             }
             Command::For((times, commands)) => {
-                let tmp = eval_for(times, commands, &variables);
+                let tmp = eval_for(times, commands, &variables, life_time);
                 for elem in tmp {
                     match elem {
                         Command::ConditionalBlock(branches) => {
-                            let tmp2 = eval_conditional_block(branches, &variables);
+                            let tmp2 = eval_conditional_block(branches, &variables, life_time);
                             for elem2 in tmp2 {
                                 match elem2 {
                                     Command::Instantiation(node) => match node {
                                         Node::Circle(v) => match v {
                                             Operation::Calculation((l, op, r)) => {
-                                                let a = eval(*l, op, *r, &variables);
+                                                let a = eval(*l, op, *r, &variables, life_time);
                                                 draw.ellipse()
                                                     .x_y(position.0, position.1)
                                                     .w_h(a, a)
@@ -739,22 +821,24 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                                                     var_name.to_string(),
                                                                 ),
                                                                 &variables,
+                                                                life_time,
                                                             ),
                                                             get_value(
                                                                 Factor::Variable(
                                                                     var_name.to_string(),
                                                                 ),
                                                                 &variables,
+                                                                life_time,
                                                             ),
                                                         )
                                                         .color(color);
                                                 }
                                                 Factor::Boolean(_) => unimplemented!(),
                                                 Factor::Sin(val) => {
-                                                    draw.ellipse()
-                                                        .x_y(position.0, position.1)
-                                                        .w_h(val.sin(), val.sin())
-                                                        .color(color);
+                                                    // draw.ellipse()
+                                                    //     .x_y(position.0, position.1)
+                                                    //     .w_h(val.sin(), val.sin())
+                                                    //     .color(color);
                                                 }
                                                 Factor::Cos(val) => {
                                                     draw.ellipse()
@@ -762,19 +846,22 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                                         .w_h(val.cos(), val.cos())
                                                         .color(color);
                                                 }
+                                                Factor::Time => unimplemented!(),
                                             },
                                             _ => unimplemented!(),
                                         },
                                         Node::Square((width, height)) => {
                                             let width = match width {
                                                 Operation::Calculation((l, op, right)) => {
-                                                    eval(*l, op, *right, &variables)
+                                                    eval(*l, op, *right, &variables, life_time)
                                                 }
                                                 Operation::Identity(l) => match l {
                                                     Factor::Number(value) => value,
-                                                    Factor::Variable(var) => {
-                                                        get_value(Factor::Variable(var), &variables)
-                                                    }
+                                                    Factor::Variable(var) => get_value(
+                                                        Factor::Variable(var),
+                                                        &variables,
+                                                        life_time,
+                                                    ),
                                                     _ => unimplemented!(),
                                                 },
                                                 _ => unimplemented!(),
@@ -782,13 +869,15 @@ fn view(app: &App, model: &Model, frame: &Frame) {
 
                                             let height = match height {
                                                 Operation::Calculation((l, op, right)) => {
-                                                    eval(*l, op, *right, &variables)
+                                                    eval(*l, op, *right, &variables, life_time)
                                                 }
                                                 Operation::Identity(l) => match l {
                                                     Factor::Number(value) => value,
-                                                    Factor::Variable(var) => {
-                                                        get_value(Factor::Variable(var), &variables)
-                                                    }
+                                                    Factor::Variable(var) => get_value(
+                                                        Factor::Variable(var),
+                                                        &variables,
+                                                        life_time,
+                                                    ),
                                                     _ => unimplemented!(),
                                                 },
                                                 _ => unimplemented!(),
@@ -803,26 +892,30 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                     Command::Move((x, y)) => {
                                         position.0 += match x {
                                             Operation::Calculation((l, op, right)) => {
-                                                eval(*l, op, *right, &variables)
+                                                eval(*l, op, *right, &variables, life_time)
                                             }
                                             Operation::Identity(l) => match l {
                                                 Factor::Number(value) => value,
-                                                Factor::Variable(var) => {
-                                                    get_value(Factor::Variable(var), &variables)
-                                                }
+                                                Factor::Variable(var) => get_value(
+                                                    Factor::Variable(var),
+                                                    &variables,
+                                                    life_time,
+                                                ),
                                                 _ => unimplemented!(),
                                             },
                                             _ => unimplemented!(),
                                         };
                                         position.1 += match y {
                                             Operation::Calculation((l, op, right)) => {
-                                                eval(*l, op, *right, &variables)
+                                                eval(*l, op, *right, &variables, life_time)
                                             }
                                             Operation::Identity(l) => match l {
                                                 Factor::Number(value) => value,
-                                                Factor::Variable(var) => {
-                                                    get_value(Factor::Variable(var), &variables)
-                                                }
+                                                Factor::Variable(var) => get_value(
+                                                    Factor::Variable(var),
+                                                    &variables,
+                                                    life_time,
+                                                ),
                                                 _ => unimplemented!(),
                                             },
                                             _ => unimplemented!(),
@@ -839,7 +932,7 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                         Command::Instantiation(node) => match node {
                             Node::Circle(v) => match v {
                                 Operation::Calculation((l, op, r)) => {
-                                    let a = eval(*l, op, *r, &variables);
+                                    let a = eval(*l, op, *r, &variables, life_time);
                                     draw.ellipse()
                                         .x_y(position.0, position.1)
                                         .w_h(a, a)
@@ -859,20 +952,22 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                                 get_value(
                                                     Factor::Variable(var_name.to_string()),
                                                     &variables,
+                                                    life_time,
                                                 ),
                                                 get_value(
                                                     Factor::Variable(var_name.to_string()),
                                                     &variables,
+                                                    life_time,
                                                 ),
                                             )
                                             .color(color);
                                     }
                                     Factor::Boolean(_) => unimplemented!(),
                                     Factor::Sin(val) => {
-                                        draw.ellipse()
-                                            .x_y(position.0, position.1)
-                                            .w_h(val.sin(), val.sin())
-                                            .color(color);
+                                        // draw.ellipse()
+                                        //     .x_y(position.0, position.1)
+                                        //     .w_h(val.sin(), val.sin())
+                                        //     .color(color);
                                     }
                                     Factor::Cos(val) => {
                                         draw.ellipse()
@@ -880,18 +975,19 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                             .w_h(val.cos(), val.cos())
                                             .color(color);
                                     }
+                                    Factor::Time => unimplemented!(),
                                 },
                                 _ => unimplemented!(),
                             },
                             Node::Square((width, height)) => {
                                 let width = match width {
                                     Operation::Calculation((l, op, right)) => {
-                                        eval(*l, op, *right, &variables)
+                                        eval(*l, op, *right, &variables, life_time)
                                     }
                                     Operation::Identity(l) => match l {
                                         Factor::Number(value) => value,
                                         Factor::Variable(var) => {
-                                            get_value(Factor::Variable(var), &variables)
+                                            get_value(Factor::Variable(var), &variables, life_time)
                                         }
                                         _ => unimplemented!(),
                                     },
@@ -900,12 +996,12 @@ fn view(app: &App, model: &Model, frame: &Frame) {
 
                                 let height = match height {
                                     Operation::Calculation((l, op, right)) => {
-                                        eval(*l, op, *right, &variables)
+                                        eval(*l, op, *right, &variables, life_time)
                                     }
                                     Operation::Identity(l) => match l {
                                         Factor::Number(value) => value,
                                         Factor::Variable(var) => {
-                                            get_value(Factor::Variable(var), &variables)
+                                            get_value(Factor::Variable(var), &variables, life_time)
                                         }
                                         _ => unimplemented!(),
                                     },
@@ -921,12 +1017,12 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                         Command::Move((x, y)) => {
                             position.0 += match x {
                                 Operation::Calculation((l, op, right)) => {
-                                    eval(*l, op, *right, &variables)
+                                    eval(*l, op, *right, &variables, life_time)
                                 }
                                 Operation::Identity(l) => match l {
                                     Factor::Number(value) => value,
                                     Factor::Variable(var) => {
-                                        get_value(Factor::Variable(var), &variables)
+                                        get_value(Factor::Variable(var), &variables, life_time)
                                     }
                                     _ => unimplemented!(),
                                 },
@@ -934,12 +1030,12 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                             };
                             position.1 += match y {
                                 Operation::Calculation((l, op, right)) => {
-                                    eval(*l, op, *right, &variables)
+                                    eval(*l, op, *right, &variables, life_time)
                                 }
                                 Operation::Identity(l) => match l {
                                     Factor::Number(value) => value,
                                     Factor::Variable(var) => {
-                                        get_value(Factor::Variable(var), &variables)
+                                        get_value(Factor::Variable(var), &variables, life_time)
                                     }
                                     _ => unimplemented!(),
                                 },
@@ -956,19 +1052,27 @@ fn view(app: &App, model: &Model, frame: &Frame) {
             }
             Command::Move((x, y)) => {
                 position.0 += match x {
-                    Operation::Calculation((l, op, right)) => eval(*l, op, *right, &variables),
+                    Operation::Calculation((l, op, right)) => {
+                        eval(*l, op, *right, &variables, life_time)
+                    }
                     Operation::Identity(l) => match l {
                         Factor::Number(value) => value,
-                        Factor::Variable(var) => get_value(Factor::Variable(var), &variables),
+                        Factor::Variable(var) => {
+                            get_value(Factor::Variable(var), &variables, life_time)
+                        }
                         _ => unimplemented!(),
                     },
                     _ => unimplemented!(),
                 };
                 position.1 += match y {
-                    Operation::Calculation((l, op, right)) => eval(*l, op, *right, &variables),
+                    Operation::Calculation((l, op, right)) => {
+                        eval(*l, op, *right, &variables, life_time)
+                    }
                     Operation::Identity(l) => match l {
                         Factor::Number(value) => value,
-                        Factor::Variable(var) => get_value(Factor::Variable(var), &variables),
+                        Factor::Variable(var) => {
+                            get_value(Factor::Variable(var), &variables, life_time)
+                        }
                         _ => unimplemented!(),
                     },
                     _ => unimplemented!(),

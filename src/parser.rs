@@ -30,8 +30,9 @@ pub enum Factor {
     Variable(String),
     Number(f32),
     Boolean(bool),
-    Sin(f32),
+    Sin(Box<Operation>),
     Cos(f32),
+    Time,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -108,13 +109,13 @@ pub fn variable(input: &str) -> IResult<&str, Factor, Error<&str>> {
 
 pub fn sin(input: &str) -> IResult<&str, Factor, Error<&str>> {
     map(
-        tuple((
-            tag("sin"),
-            multispace0,
-            delimited(tag("("), float, tag(")")),
-        )),
-        |(_, _, val)| Factor::Sin(val),
+        tuple((tag("sin"), multispace0, delimited(tag("("), expr, tag(")")))),
+        |(_, _, val)| Factor::Sin(Box::new(val)),
     )(input)
+}
+
+pub fn time(input: &str) -> IResult<&str, Factor, Error<&str>> {
+    map(tag("time"), |_| Factor::Time)(input)
 }
 
 pub fn mult(input: &str) -> IResult<&str, Builtin, Error<&str>> {
@@ -139,6 +140,7 @@ pub fn factor(input: &str) -> IResult<&str, Operation, Error<&str>> {
             space0,
             alt((
                 delimited(tag("("), expr, tag(")")),
+                map(time, Operation::Identity),
                 map(sin, Operation::Identity),
                 map(variable, Operation::Identity),
                 map(number, Operation::Identity),
