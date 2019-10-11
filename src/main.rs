@@ -1,9 +1,13 @@
 mod parser;
+mod tests;
 use colored::Colorize;
 use nannou::app::Draw;
 use nannou::prelude::*;
 use nannou::ui::prelude::*;
+use nannou_audio as audio;
+use nannou_audio::Buffer;
 use parser::*;
+
 use std::collections::HashMap;
 fn get_value(factor: Factor, variables: &HashMap<String, f32>, time: f32) -> f32 {
     match factor {
@@ -14,7 +18,11 @@ fn get_value(factor: Factor, variables: &HashMap<String, f32>, time: f32) -> f32
             Operation::Identity(val) => get_value(val, variables, time).sin(),
             _ => unimplemented!(),
         },
-        Factor::Cos(val) => 0.0,
+        Factor::Cos(v) => match *v {
+            Operation::Calculation((l, op, right)) => eval(*l, op, *right, &variables, time).cos(),
+            Operation::Identity(val) => get_value(val, variables, time).cos(),
+            _ => unimplemented!(),
+        },
         Factor::Time => time,
         _ => unimplemented!(),
     }
@@ -399,8 +407,9 @@ fn eval_for(
                     c.push(Command::Instantiation(nd));
                 }
                 Command::Declaration((name, value)) => {
-                    let (name, value) = declare_variable((name, value), &variables, life_time);
-                    v.insert(name, value);
+                    // let (name, value) = declare_variable((name, value), &variables, life_time);
+                    // v.insert(name, value);
+                    c.push(Command::Declaration((name, value)));
                 }
                 Command::ConditionalBlock(cb) => {
                     let nodes = eval_conditional_block(cb, &variables, life_time);
@@ -486,11 +495,17 @@ struct Model {
     //variables: HashMap<String, f32>,
     instructions: Vec<Command>,
     life_time: f32,
+    stream: audio::Stream<Audio>,
+}
+
+struct Audio {
+    phase: f64,
+    hz: f64,
 }
 
 struct Ids {
     text_edit: widget::Id,
-    life_time: widget::Id,
+    _life_time: widget::Id,
 }
 
 fn model(app: &App) -> Model {
@@ -522,7 +537,7 @@ fn model(app: &App) -> Model {
     // Generate some ids for our widgets.
     let ids = Ids {
         text_edit: ui.generate_widget_id(),
-        life_time: ui.generate_widget_id(),
+        _life_time: ui.generate_widget_id(),
     };
 
     // Init our variables
@@ -530,7 +545,17 @@ fn model(app: &App) -> Model {
     let life_time = 0.0;
     //let variables = HashMap::new();
     let instructions: Vec<Command> = Vec::new();
+    let m = Audio {
+        phase: 0.0,
+        hz: 2440.0,
+    };
 
+    let audio_host = audio::Host::new();
+    let stream = audio_host
+        .new_output_stream(m)
+        .render(audio)
+        .build()
+        .unwrap();
     Model {
         ui,
         ids,
@@ -538,6 +563,22 @@ fn model(app: &App) -> Model {
         //variables,
         instructions,
         life_time,
+        stream,
+    }
+}
+
+fn audio(audio: &mut Audio, buffer: &mut Buffer) {
+    let sample_rate = buffer.sample_rate() as f64;
+    println!("{}", sample_rate);
+    let volume = 0.5;
+    for frame in buffer.frames_mut() {
+        let sine_amp = (2.0 * PI * audio.phase as f32).sin() as f32;
+        audio.phase += audio.hz / sample_rate;
+        audio.phase %= sample_rate;
+        for channel in frame {
+            *channel = sine_amp * volume;
+            println!("{}", sine_amp);
+        }
     }
 }
 
@@ -615,14 +656,47 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                     .w_h(val, val)
                                     .color(color);
                             }
-                            Operation::Identity(v) => unimplemented!(),
+                            Operation::Identity(v) => match v {
+                                Factor::Number(value) => {
+                                    draw.ellipse()
+                                        .x_y(position.0, position.1)
+                                        .w_h(value.sin(), value.sin())
+                                        .color(color);
+                                }
+                                Factor::Variable(v) => {
+                                    draw.ellipse()
+                                        .x_y(position.0, position.1)
+                                        .w_h(
+                                            get_value(
+                                                Factor::Variable(v.to_string()),
+                                                &variables,
+                                                life_time,
+                                            )
+                                            .sin(),
+                                            get_value(
+                                                Factor::Variable(v.to_string()),
+                                                &variables,
+                                                life_time,
+                                            )
+                                            .sin(),
+                                        )
+                                        .color(color);
+                                }
+                                Factor::Time => {
+                                    draw.ellipse()
+                                        .x_y(position.0, position.1)
+                                        .w_h(life_time.sin(), life_time.sin())
+                                        .color(color);
+                                }
+                                _ => unimplemented!(),
+                            },
                             _ => unimplemented!(),
                         },
                         Factor::Cos(val) => {
-                            draw.ellipse()
-                                .x_y(position.0, position.1)
-                                .w_h(val.cos(), val.cos())
-                                .color(color);
+                            //draw.ellipse()
+                            //.x_y(position.0, position.1)
+                            //.w_h(val.cos(), val.cos())
+                            //.color(color);
                         }
                         Factor::Time => unimplemented!(),
                     },
@@ -638,6 +712,18 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                             Factor::Variable(var) => {
                                 get_value(Factor::Variable(var), &variables, life_time)
                             }
+                            Factor::Sin(val) => match *val {
+                                Operation::Calculation((l, op, r)) => {
+                                    eval(*l, op, *r, &variables, life_time).sin()
+                                }
+                                Operation::Identity(val) => match val {
+                                    Factor::Variable(l) => {
+                                        get_value(Factor::Variable(l), &variables, life_time).sin()
+                                    }
+                                    _ => unimplemented!(),
+                                },
+                                _ => unimplemented!(),
+                            },
                             _ => unimplemented!(),
                         },
                         _ => unimplemented!(),
@@ -652,6 +738,18 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                             Factor::Variable(var) => {
                                 get_value(Factor::Variable(var), &variables, life_time)
                             }
+                            Factor::Sin(val) => match *val {
+                                Operation::Calculation((l, op, r)) => {
+                                    eval(*l, op, *r, &variables, life_time).sin()
+                                }
+                                Operation::Identity(val) => match val {
+                                    Factor::Variable(l) => {
+                                        get_value(Factor::Variable(l), &variables, life_time).sin()
+                                    }
+                                    _ => unimplemented!(),
+                                },
+                                _ => unimplemented!(),
+                            },
                             _ => unimplemented!(),
                         },
                         _ => unimplemented!(),
@@ -701,17 +799,50 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                             .color(color);
                                     }
                                     Factor::Boolean(_) => unimplemented!(),
-                                    Factor::Sin(val) => {
+                                    Factor::Sin(val) => match *val {
+                                        Operation::Calculation((l, op, r)) => {
+                                            let val = eval(*l, op, *r, &variables, life_time).sin();
+                                            dbg!(val);
+                                            draw.ellipse()
+                                                .x_y(position.0, position.1)
+                                                .w_h(val, val)
+                                                .color(color);
+                                        }
+                                        Operation::Identity(v) => match v {
+                                            Factor::Number(value) => {
+                                                draw.ellipse()
+                                                    .x_y(position.0, position.1)
+                                                    .w_h(value.sin(), value.sin())
+                                                    .color(color);
+                                            }
+                                            Factor::Variable(v) => {
+                                                draw.ellipse()
+                                                    .x_y(position.0, position.1)
+                                                    .w_h(
+                                                        get_value(
+                                                            Factor::Variable(v.to_string()),
+                                                            &variables,
+                                                            life_time,
+                                                        )
+                                                        .sin(),
+                                                        get_value(
+                                                            Factor::Variable(v.to_string()),
+                                                            &variables,
+                                                            life_time,
+                                                        )
+                                                        .sin(),
+                                                    )
+                                                    .color(color);
+                                            }
+                                            _ => unimplemented!(),
+                                        },
+                                        _ => unimplemented!(),
+                                    },
+                                    Factor::Cos(val) => {
                                         // draw.ellipse()
                                         //     .x_y(position.0, position.1)
-                                        //     .w_h(val.sin(), val.sin())
+                                        //     .w_h(val.cos(), val.cos())
                                         //     .color(color);
-                                    }
-                                    Factor::Cos(val) => {
-                                        draw.ellipse()
-                                            .x_y(position.0, position.1)
-                                            .w_h(val.cos(), val.cos())
-                                            .color(color);
                                     }
                                     Factor::Time => unimplemented!(),
                                 },
@@ -834,17 +965,56 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                                         .color(color);
                                                 }
                                                 Factor::Boolean(_) => unimplemented!(),
-                                                Factor::Sin(val) => {
+                                                Factor::Sin(val) => match *val {
+                                                    Operation::Calculation((l, op, r)) => {
+                                                        let val =
+                                                            eval(*l, op, *r, &variables, life_time)
+                                                                .sin();
+                                                        dbg!(val);
+                                                        draw.ellipse()
+                                                            .x_y(position.0, position.1)
+                                                            .w_h(val, val)
+                                                            .color(color);
+                                                    }
+                                                    Operation::Identity(v) => match v {
+                                                        Factor::Number(value) => {
+                                                            draw.ellipse()
+                                                                .x_y(position.0, position.1)
+                                                                .w_h(value.sin(), value.sin())
+                                                                .color(color);
+                                                        }
+                                                        Factor::Variable(v) => {
+                                                            draw.ellipse()
+                                                                .x_y(position.0, position.1)
+                                                                .w_h(
+                                                                    get_value(
+                                                                        Factor::Variable(
+                                                                            v.to_string(),
+                                                                        ),
+                                                                        &variables,
+                                                                        life_time,
+                                                                    )
+                                                                    .sin(),
+                                                                    get_value(
+                                                                        Factor::Variable(
+                                                                            v.to_string(),
+                                                                        ),
+                                                                        &variables,
+                                                                        life_time,
+                                                                    )
+                                                                    .sin(),
+                                                                )
+                                                                .color(color);
+                                                        }
+                                                        _ => unimplemented!(),
+                                                    },
+                                                    _ => unimplemented!(),
+                                                },
+                                                Factor::Cos(val) => {
                                                     // draw.ellipse()
                                                     //     .x_y(position.0, position.1)
-                                                    //     .w_h(val.sin(), val.sin())
+                                                    //     .w_h(val.cos(), val.cos())
                                                     //     .color(color);
-                                                }
-                                                Factor::Cos(val) => {
-                                                    draw.ellipse()
-                                                        .x_y(position.0, position.1)
-                                                        .w_h(val.cos(), val.cos())
-                                                        .color(color);
                                                 }
                                                 Factor::Time => unimplemented!(),
                                             },
@@ -963,17 +1133,55 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                                             .color(color);
                                     }
                                     Factor::Boolean(_) => unimplemented!(),
-                                    Factor::Sin(val) => {
+                                    Factor::Sin(val) => match *val {
+                                        Operation::Calculation((l, op, r)) => {
+                                            let val = eval(*l, op, *r, &variables, life_time).sin();
+                                            draw.ellipse()
+                                                .x_y(position.0, position.1)
+                                                .w_h(val, val)
+                                                .color(color);
+                                        }
+                                        Operation::Identity(v) => match v {
+                                            Factor::Number(value) => {
+                                                draw.ellipse()
+                                                    .x_y(position.0, position.1)
+                                                    .w_h(value.sin(), value.sin())
+                                                    .color(color);
+                                            }
+                                            Factor::Variable(v) => {
+                                                draw.ellipse()
+                                                    .x_y(position.0, position.1)
+                                                    .w_h(
+                                                        get_value(
+                                                            Factor::Variable(v.to_string()),
+                                                            &variables,
+                                                            life_time,
+                                                        )
+                                                        .sin(),
+                                                        get_value(
+                                                            Factor::Variable(v.to_string()),
+                                                            &variables,
+                                                            life_time,
+                                                        )
+                                                        .sin(),
+                                                    )
+                                                    .color(color);
+                                            }
+                                            Factor::Time => {
+                                                draw.ellipse()
+                                                    .x_y(position.0, position.1)
+                                                    .w_h(life_time.sin(), life_time.sin())
+                                                    .color(color);
+                                            }
+                                            _ => unimplemented!(),
+                                        },
+                                        _ => unimplemented!(),
+                                    },
+                                    Factor::Cos(val) => {
                                         // draw.ellipse()
                                         //     .x_y(position.0, position.1)
-                                        //     .w_h(val.sin(), val.sin())
+                                        //     .w_h(val.cos(), val.cos())
                                         //     .color(color);
-                                    }
-                                    Factor::Cos(val) => {
-                                        draw.ellipse()
-                                            .x_y(position.0, position.1)
-                                            .w_h(val.cos(), val.cos())
-                                            .color(color);
                                     }
                                     Factor::Time => unimplemented!(),
                                 },
@@ -1046,6 +1254,50 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                             position.0 = 0.0;
                             position.1 = 0.0;
                         }
+                        Command::Color((r, g, b)) => {
+                            let r = match r {
+                                Operation::Calculation((left, op, right)) => {
+                                    eval(*left, op, *right, &variables, life_time)
+                                }
+                                Operation::Identity(f) => match f {
+                                    Factor::Number(val) => val,
+                                    Factor::Variable(var) => {
+                                        get_value(Factor::Variable(var), &variables, life_time)
+                                    }
+                                    _ => 0.0,
+                                },
+                                _ => unimplemented!(),
+                            };
+                            let g = match g {
+                                Operation::Calculation((left, op, right)) => {
+                                    eval(*left, op, *right, &variables, life_time)
+                                }
+                                Operation::Identity(f) => match f {
+                                    Factor::Number(val) => val,
+                                    Factor::Variable(var) => {
+                                        get_value(Factor::Variable(var), &variables, life_time)
+                                    }
+                                    _ => 0.0,
+                                },
+                                _ => unimplemented!(),
+                            };
+                            let b = match b {
+                                Operation::Calculation((left, op, right)) => {
+                                    eval(*left, op, *right, &variables, life_time)
+                                }
+                                Operation::Identity(f) => match f {
+                                    Factor::Number(val) => val,
+                                    Factor::Variable(var) => {
+                                        get_value(Factor::Variable(var), &variables, life_time)
+                                    }
+                                    _ => 0.0,
+                                },
+                                _ => unimplemented!(),
+                            };
+                            color = rgb(r, g, b);
+                        }
+                        // declaration inside For
+                        Command::Declaration(_) => unimplemented!(),
                         _ => unimplemented!(),
                     }
                 }
@@ -1060,6 +1312,19 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                         Factor::Variable(var) => {
                             get_value(Factor::Variable(var), &variables, life_time)
                         }
+                        Factor::Sin(op) => match *op {
+                            Operation::Calculation((l, op, right)) => {
+                                eval(*l, op, *right, &variables, life_time)
+                            }
+                            Operation::Identity(val) => match val {
+                                Factor::Time => life_time.sin(),
+                                _ => unimplemented!(),
+                            },
+                            _ => {
+                                println!("istruzione move non valida..");
+                                0.0
+                            }
+                        },
                         _ => unimplemented!(),
                     },
                     _ => unimplemented!(),
@@ -1073,6 +1338,19 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                         Factor::Variable(var) => {
                             get_value(Factor::Variable(var), &variables, life_time)
                         }
+                        Factor::Sin(op) => match *op {
+                            Operation::Calculation((l, op, right)) => {
+                                eval(*l, op, *right, &variables, life_time)
+                            }
+                            Operation::Identity(val) => match val {
+                                Factor::Time => life_time.sin(),
+                                _ => unimplemented!(),
+                            },
+                            _ => {
+                                println!("istruzione move non valida..");
+                                0.0
+                            }
+                        },
                         _ => unimplemented!(),
                     },
                     _ => unimplemented!(),
@@ -1083,6 +1361,45 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                 position.1 = 0.0;
             }
             Command::Color((r, g, b)) => {
+                let r = match r {
+                    Operation::Calculation((left, op, right)) => {
+                        eval(*left, op, *right, &variables, life_time)
+                    }
+                    Operation::Identity(f) => match f {
+                        Factor::Number(val) => val,
+                        Factor::Variable(var) => {
+                            get_value(Factor::Variable(var), &variables, life_time)
+                        }
+                        _ => 0.0,
+                    },
+                    _ => unimplemented!(),
+                };
+                let g = match g {
+                    Operation::Calculation((left, op, right)) => {
+                        eval(*left, op, *right, &variables, life_time)
+                    }
+                    Operation::Identity(f) => match f {
+                        Factor::Number(val) => val,
+                        Factor::Variable(var) => {
+                            get_value(Factor::Variable(var), &variables, life_time)
+                        }
+                        _ => 0.0,
+                    },
+                    _ => unimplemented!(),
+                };
+                let b = match b {
+                    Operation::Calculation((left, op, right)) => {
+                        eval(*left, op, *right, &variables, life_time)
+                    }
+                    Operation::Identity(f) => match f {
+                        Factor::Number(val) => val,
+                        Factor::Variable(var) => {
+                            get_value(Factor::Variable(var), &variables, life_time)
+                        }
+                        _ => 0.0,
+                    },
+                    _ => unimplemented!(),
+                };
                 color = rgb(r, g, b);
             }
         }
@@ -1150,7 +1467,18 @@ fn event(_app: &App, _model: &mut Model, event: Event) {
 
 fn raw_window_event(_app: &App, _model: &mut Model, _event: nannou::winit::WindowEvent) {}
 
-fn key_pressed(_app: &App, _model: &mut Model, _key: Key) {}
+fn key_pressed(_app: &App, model: &mut Model, key: Key) {
+    match key {
+        Key::Backslash => {
+            if model.stream.is_playing() {
+                model.stream.pause().unwrap();
+            } else {
+                model.stream.play().unwrap();
+            }
+        }
+        _ => {}
+    }
+}
 
 fn key_released(_app: &App, _model: &mut Model, _key: Key) {}
 
