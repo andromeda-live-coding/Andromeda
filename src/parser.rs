@@ -165,7 +165,7 @@ fn term(i: &str) -> IResult<&str, Operation, Error<&str>> {
     )(i)
 }
 
-fn expr(i: &str) -> IResult<&str, Operation, Error<&str>> {
+pub fn expr(i: &str) -> IResult<&str, Operation, Error<&str>> {
     let (i, init) = term(i)?;
 
     fold_many0(

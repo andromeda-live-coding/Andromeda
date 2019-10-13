@@ -1,6 +1,46 @@
 use super::parser::*;
 
 #[test]
+fn left_recursive() {
+    let (rest, expr) = expr("1+2+3").unwrap();
+    assert_eq!(rest, "");
+    assert_eq!(
+        expr,
+        Operation::Calculation((
+            Box::new(Operation::Calculation((
+                Box::new(Operation::Identity(Factor::Number(1.0))),
+                Builtin::Plus,
+                Box::new(Operation::Identity(Factor::Number(2.0)))
+            ))),
+            Builtin::Plus,
+            Box::new(Operation::Identity(Factor::Number(3.0)))
+        ))
+    );
+}
+
+#[test]
+fn left_recursive2() {
+    let (rest, expr) = expr("1+2+3+4").unwrap();
+    assert_eq!(rest, "");
+    assert_eq!(
+        expr,
+        Operation::Calculation((
+            Box::new(Operation::Calculation((
+                Box::new(Operation::Calculation((
+                    Box::new(Operation::Identity(Factor::Number(1.0))),
+                    Builtin::Plus,
+                    Box::new(Operation::Identity(Factor::Number(2.0)))
+                ))),
+                Builtin::Plus,
+                Box::new(Operation::Identity(Factor::Number(3.0)))
+            ))),
+            Builtin::Plus,
+            Box::new(Operation::Identity(Factor::Number(4.0)))
+        ))
+    );
+}
+
+#[test]
 fn declare_variable() {
     let (rest, commands) = parser("x: 2").unwrap();
     assert_eq!(
