@@ -335,7 +335,7 @@ fn eval_conditional_block(
                                 }
                                 Command::ResetMove => nodes.push(Command::ResetMove),
                                 Command::Move((x, y)) => nodes.push(Command::Move((x, y))),
-                                Command::Color(_) => unimplemented!(),
+                                Command::Color((r, g, b)) => nodes.push(Command::Color((r, g, b))),
                             }
                         }
                     } else {
@@ -988,6 +988,48 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                             position.0 = 0.0;
                             position.1 = 0.0;
                         }
+                        Command::Color((r, g, b)) => {
+                            let r = match r {
+                                Operation::Calculation((left, op, right)) => {
+                                    eval(*left, op, *right, &variables, life_time)
+                                }
+                                Operation::Identity(f) => match f {
+                                    Factor::Number(val) => val,
+                                    Factor::Variable(var) => {
+                                        get_value(Factor::Variable(var), &variables, life_time)
+                                    }
+                                    _ => 0.0,
+                                },
+                                _ => unimplemented!(),
+                            };
+                            let g = match g {
+                                Operation::Calculation((left, op, right)) => {
+                                    eval(*left, op, *right, &variables, life_time)
+                                }
+                                Operation::Identity(f) => match f {
+                                    Factor::Number(val) => val,
+                                    Factor::Variable(var) => {
+                                        get_value(Factor::Variable(var), &variables, life_time)
+                                    }
+                                    _ => 0.0,
+                                },
+                                _ => unimplemented!(),
+                            };
+                            let b = match b {
+                                Operation::Calculation((left, op, right)) => {
+                                    eval(*left, op, *right, &variables, life_time)
+                                }
+                                Operation::Identity(f) => match f {
+                                    Factor::Number(val) => val,
+                                    Factor::Variable(var) => {
+                                        get_value(Factor::Variable(var), &variables, life_time)
+                                    }
+                                    _ => 0.0,
+                                },
+                                _ => unimplemented!(),
+                            };
+                            color = rgb(r, g, b);
+                        }
                         _ => unimplemented!(),
                     }
                 }
@@ -1456,7 +1498,6 @@ fn view(app: &App, model: &Model, frame: &Frame) {
                             };
                             color = rgb(r, g, b);
                         }
-                        // declaration inside For
                         Command::Declaration(d) => {
                             let (name, value) = declare_variable(d, &variables, 0.0);
                             variables.insert(name, value);
