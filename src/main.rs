@@ -3,8 +3,8 @@ mod tests;
 use colored::Colorize;
 use nannou::prelude::*;
 use nannou::ui::prelude::*;
-use nannou_audio as audio;
-use nannou_audio::Buffer;
+// use nannou_audio as audio;
+// use nannou_audio::Buffer;
 use parser::*;
 
 use std::collections::HashMap;
@@ -490,7 +490,7 @@ struct Model {
     //variables: HashMap<String, f32>,
     instructions: Vec<Command>,
     life_time: f32,
-    stream: audio::Stream<Audio>,
+    // stream: audio::Stream<Audio>,
 }
 
 struct Audio {
@@ -540,17 +540,17 @@ fn model(app: &App) -> Model {
     let life_time = 0.0;
     //let variables = HashMap::new();
     let instructions: Vec<Command> = Vec::new();
-    let m = Audio {
-        phase: 0.0,
-        hz: 2440.0,
-    };
+    // let m = Audio {
+    //     phase: 0.0,
+    //     hz: 2440.0,
+    // };
 
-    let audio_host = audio::Host::new();
-    let stream = audio_host
-        .new_output_stream(m)
-        .render(audio)
-        .build()
-        .unwrap();
+    // let audio_host = audio::Host::new();
+    // let stream = audio_host
+    //     .new_output_stream(m)
+    //     .render(audio)
+    //     .build()
+    //     .unwrap();
     Model {
         ui,
         ids,
@@ -558,24 +558,24 @@ fn model(app: &App) -> Model {
         //variables,
         instructions,
         life_time,
-        stream,
+        // stream,
     }
 }
 
-fn audio(audio: &mut Audio, buffer: &mut Buffer) {
-    let sample_rate = buffer.sample_rate() as f64;
-    println!("{}", sample_rate);
-    let volume = 0.5;
-    for frame in buffer.frames_mut() {
-        let sine_amp = (2.0 * PI * audio.phase as f32).sin() as f32;
-        audio.phase += audio.hz / sample_rate;
-        audio.phase %= sample_rate;
-        for channel in frame {
-            *channel = sine_amp * volume;
-            println!("{}", sine_amp);
-        }
-    }
-}
+// fn audio(audio: &mut Audio, buffer: &mut Buffer) {
+//     let sample_rate = buffer.sample_rate() as f64;
+//     println!("{}", sample_rate);
+//     let volume = 0.5;
+//     for frame in buffer.frames_mut() {
+//         let sine_amp = (2.0 * PI * audio.phase as f32).sin() as f32;
+//         audio.phase += audio.hz / sample_rate;
+//         audio.phase %= sample_rate;
+//         for channel in frame {
+//             *channel = sine_amp * volume;
+//             println!("{}", sine_amp);
+//         }
+//     }
+// }
 
 fn update(_app: &App, model: &mut Model, _update: Update) {
     let ui = &mut model.ui.set_widgets();
@@ -1672,16 +1672,16 @@ fn event(_app: &App, _model: &mut Model, event: Event) {
 fn raw_window_event(_app: &App, _model: &mut Model, _event: nannou::winit::WindowEvent) {}
 
 fn key_pressed(_app: &App, model: &mut Model, key: Key) {
-    match key {
-        Key::Backslash => {
-            if model.stream.is_playing() {
-                model.stream.pause().unwrap();
-            } else {
-                model.stream.play().unwrap();
-            }
-        }
-        _ => {}
-    }
+    // match key {
+    //     Key::Backslash => {
+    //         if model.stream.is_playing() {
+    //             model.stream.pause().unwrap();
+    //         } else {
+    //             model.stream.play().unwrap();
+    //         }
+    //     }
+    //     _ => {}
+    // }
 }
 
 fn key_released(_app: &App, _model: &mut Model, _key: Key) {}
